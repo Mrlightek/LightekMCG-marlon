@@ -1,9 +1,12 @@
+# lib/marlon/service.rb
 module Marlon
   class Service
-    def initialize; end
+    def initialize(context = {})
+      @context = context
+    end
 
     def call(_payload)
-      raise NotImplementedError
+      raise NotImplementedError, "Service must implement #call"
     end
   end
 end

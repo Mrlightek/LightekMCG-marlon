@@ -1,0 +1,57 @@
+# lib/marlon/router.rb - (advanced router with hooks)
+module Marlon
+  class Router
+    class << self
+      def route(payload)
+        payload = symbolize_keys(payload)
+        run_before_hooks(payload)
+        action = payload[:action] || payload[:type]
+        raise ArgumentError, "Missing action in payload" unless action
+
+        service_class = resolve_service_class(action)
+        service = service_class.new
+        result = service.call(payload)
+        run_after_hooks(payload, result)
+        result
+      end
+
+      def before(&block)
+        (@before_hooks ||= []) << block
+      end
+
+      def after(&block)
+        (@after_hooks ||= []) << block
+      end
+
+      private
+
+      def run_before_hooks(payload)
+        Array(@before_hooks).each { |h| h.call(payload) }
+      end
+
+      def run_after_hooks(payload, result)
+        Array(@after_hooks).each { |h| h.call(payload, result) }
+      end
+
+      def resolve_service_class(action)
+        name = action.to_s
+        class_name = "#{name.split(/_|::/).map(&:capitalize).join}Service"
+        const_path = "Marlon::Services::#{class_name}"
+        const = safe_const_get(const_path)
+        raise NameError, "Service #{const_path} not found" unless const
+        const
+      end
+
+      def safe_const_get(path)
+        path.split("::").inject(Object) { |memo, part| memo.const_get(part) }
+      rescue NameError
+        nil
+      end
+
+      def symbolize_keys(hash)
+        return hash unless hash.is_a?(Hash)
+        hash.each_with_object({}) { |(k, v), h| h[k.to_sym] = v.is_a?(Hash) ? symbolize_keys(v) : v }
+      end
+    end
+  end
+end

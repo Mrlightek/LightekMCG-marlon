@@ -1,0 +1,11 @@
+# lib/marlon/services/<%= file_name %>.rb
+module Marlon
+  module Services
+    class <%= class_name %>Service < Marlon::Service
+      def call(payload)
+        # TODO: implement <%= class_name %>Service
+        puts "[MARLON] <%= class_name %>Service called with \#{payload.inspect}"
+      end
+    end
+  end
+end

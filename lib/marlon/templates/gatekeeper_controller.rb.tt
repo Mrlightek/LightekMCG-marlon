@@ -1,0 +1,49 @@
+# app/controllers/gatekeeper_controller.rb - (Gatekeeper controller, security/pipeline single point)
+class GatekeeperController < ApplicationController
+  protect_from_forgery with: :null_session
+
+  # Single entrypoint for MARLON payloads.
+  # POST /marlon/gatekeeper
+  def accept
+    payload = request.request_parameters.presence || parse_body
+    # Basic guard: token or header. Replace this hook with your own auth logic.
+    token = request.headers["X-Marlon-Token"] || payload["token"] || payload[:token]
+    config_token = load_config_token
+
+    unless valid_token?(token, config_token)
+      return render json: { error: "unauthorized" }, status: :unauthorized
+    end
+
+    begin
+      result = Marlon.route(payload.symbolize_keys)
+      render json: { success: true, result: result }, status: :ok
+    rescue => e
+      Rails.logger.error("[MARLON][Gatekeeper] #{e.class}: #{e.message}\n#{e.backtrace.join("\n")}")
+      render json: { error: e.message }, status: :unprocessable_entity
+    end
+  end
+
+  private
+
+  def parse_body
+    JSON.parse(request.body.read)
+  rescue
+    {}
+  end
+
+  def load_config_token
+    path = Rails.root.join("config", "marlon.yml")
+    if File.exist?(path)
+      YAML.load_file(path).dig("gatekeeper", "auth_token")
+    end
+  rescue
+    nil
+  end
+
+  def valid_token?(token, config_token)
+    return true if Rails.env.test? || Rails.env.development? && config_token.nil?
+    token.present? && config_token.present? && ActiveSupport::SecurityUtils.secure_compare(token.to_s, config_token.to_s)
+  rescue
+    false
+  end
+end

@@ -1,38 +1,29 @@
-#lib/marlon/generators/service_generator.rb
-#(marlon g service UserCreator)
+# lib/marlon/generators/service_generator.rb
+require_relative "base_generator"
 
 module Marlon
   module Generators
-    class ServiceGenerator
-      TEMPLATE = <<~RUBY
-        module Marlon
-          module Services
-            class %{class_name} < Marlon::Service
-              def call(payload)
-                # TODO: Implement %{class_name}
-                puts "[MARLON] Service %{class_name} received: \#{payload.inspect}"
-              end
-            end
-          end
-        end
-      RUBY
-
+    class ServiceGenerator < BaseGenerator
       def initialize(name)
         @name = name
-        @class_name = name.split("_").map(&:capitalize).join
+        @class_name = classify(name)
+        @file_name = underscore(name)
       end
 
       def generate
-        path = "lib/marlon/services/#{file_name}.rb"
-        FileUtils.mkdir_p(File.dirname(path))
-        File.write(path, TEMPLATE % { class_name: @class_name })
-        puts "Created #{path}"
+        content = render("service.rb.tt", class_name: @class_name, file_name: @file_name)
+        path = "lib/marlon/services/#{@file_name}.rb"
+        write_file(path, content)
       end
 
       private
 
-      def file_name
-        @name.gsub(/([a-z])([A-Z])/, '\1_\2').downcase
+      def classify(name)
+        name.to_s.split(/_|-/).map(&:capitalize).join
+      end
+
+      def underscore(name)
+        name.gsub(/([A-Z])/, '_\1').sub(/^_/, '').downcase
       end
     end
   end

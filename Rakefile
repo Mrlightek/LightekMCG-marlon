@@ -1,10 +1,20 @@
-# frozen_string_literal: true
+# Rakefile
+require "rake"
+require "rake/package_task"
 
-require "bundler/gem_tasks"
-require "minitest/test_task"
+task :default do
+  puts "Available tasks: gem:build, gem:install"
+end
 
-Minitest::TestTask.create
+namespace :gem do
+  desc "Build gem"
+  task :build do
+    sh "gem build marlon.gemspec"
+  end
 
-require "standard/rake"
-
-task default: %i[test standard]
+  desc "Build and install gem locally"
+  task :install => :build do
+    gem_file = Dir["marlon-*.gem"].sort.last
+    sh "gem install #{gem_file} --local"
+  end
+end

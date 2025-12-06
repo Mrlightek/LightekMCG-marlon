@@ -1,3 +1,5 @@
+mkdir -p exe
+cat > exe/marlon <<'RUBY'
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
@@ -5,3 +7,5 @@ require "marlon"
 require "marlon/cli"
 
 Marlon::CLI.start(ARGV)
+RUBY
+chmod +x exe/marlon

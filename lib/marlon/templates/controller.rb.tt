@@ -1,0 +1,6 @@
+# app/controllers/<%= file_name %>_controller.rb
+class <%= class_name %>Controller < ApplicationController
+  def index
+    render json: { status: "ok" }
+  end
+end

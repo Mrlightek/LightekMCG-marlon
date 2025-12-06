@@ -2,16 +2,16 @@
 # frozen_string_literal: true
 
 require "zeitwerk"
+require "fileutils"
+
+require_relative "marlon/version"
 
 module Marlon
   class << self
-    # Main loader
     def loader
-      @loader ||= Zeitwerk::Loader.for_gem.tap do |loader|
-        loader.inflector.inflect(
-          "mcg" => "MCG"
-        )
-        loader.setup
+      @loader ||= Zeitwerk::Loader.for_gem.tap do |l|
+        l.inflector.inflect("mcg" => "MCG") if l.respond_to?(:inflector)
+        l.setup
       end
     end
 
@@ -19,7 +19,7 @@ module Marlon
       loader
     end
 
-    # Entry point for the payload router
+    # route convenience
     def route(payload)
       Router.route(payload)
     end

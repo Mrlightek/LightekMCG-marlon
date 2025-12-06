@@ -54,6 +54,26 @@ marlon new my_framework_extension
 
 Creates a new MARLON-based gem or service.
 
+Usage examples:
+
+After you bundle install and rake gem:install (or use the installer below), you can:
+
+```bash
+# generate a service
+marlon g service CreateUser
+# generate a model
+marlon g model User name:string age:integer
+# create gatekeeper controller and insert route
+marlon g gatekeeper
+# overwrite router with more advanced router
+marlon g router
+# install into a Rails/Lightek app (creates config/initializers/marlon.rb and config/marlon.yml)
+marlon g install
+# create a complete marlon-backed gem scaffold
+marlon g framework my_component
+
+```
+
 TODO: Write usage instructions here
 
 ## Development

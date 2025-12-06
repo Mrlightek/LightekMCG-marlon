@@ -1,48 +1,34 @@
-#lib/marlon/generators/model_generator.rb
-#(marlon g model User name:string age:integer)
+# lib/marlon/generators/model_generator.rb
+require_relative "base_generator"
 
 module Marlon
   module Generators
-    class ModelGenerator
-      TEMPLATE = <<~RUBY
-        class %{class_name} < Marlon::Model
-          %{attributes}
-        end
-      RUBY
-
-      def initialize(name, fields)
+    class ModelGenerator < BaseGenerator
+      def initialize(name, fields = [])
         @name = name
         @fields = fields
+        @class_name = classify(name)
+        @file_name = underscore(name)
       end
 
       def generate
-        attribute_lines = build_attributes
-        class_name = @name.split("_").map(&:capitalize).join
-        path = "lib/marlon/models/#{file_name}.rb"
-
-        FileUtils.mkdir_p(File.dirname(path))
-
-        File.write(path, TEMPLATE % {
-          class_name: class_name,
-          attributes: attribute_lines
-        })
-
-        puts "Created #{path}"
+        attributes = @fields.map do |f|
+          name, type = f.split(":")
+          "  attribute :#{name}, :#{(type || 'string')}"
+        end.join("\n")
+        content = render("model.rb.tt", class_name: @class_name, attributes: attributes)
+        path = "lib/marlon/models/#{@file_name}.rb"
+        write_file(path, content)
       end
 
       private
 
-      def build_attributes
-        return "" if @fields.empty?
-
-        @fields.map do |f|
-          name, type = f.split(":")
-          "attribute :#{name}, :#{type}"
-        end.join("\n  ")
+      def classify(name)
+        name.to_s.split(/_|-/).map(&:capitalize).join
       end
 
-      def file_name
-        @name.downcase
+      def underscore(name)
+        name.gsub(/([A-Z])/, '_\1').sub(/^_/, '').downcase
       end
     end
   end

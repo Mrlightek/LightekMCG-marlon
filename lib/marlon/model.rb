@@ -1,3 +1,4 @@
+# lib/marlon/model.rb
 require "active_model"
 
 module Marlon
