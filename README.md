@@ -23,12 +23,11 @@ Install the gem and add to the application's Gemfile by executing:
 bundle add marlon
 ```
 
-Gem is already bundled into LightekMCG-server so just clone that repo, bare metal rails app with LightekMCG-marlon
+Marlon install:
 
-```git
-git clone git@github.com:Mrlightek/LightekMCG-server.git
+```bash
+marlon g install
 ```
-Private repo, so ssh token needs to be added to the repo first for clone to be successful
 
 If bundler is not being used to manage dependencies, install the gem by executing:
 
@@ -58,6 +57,13 @@ Creates a new MARLON-based gem or service.
 TODO: Write usage instructions here
 
 ## Development
+
+Gem is already bundled into LightekMCG-server so just clone that repo, bare metal rails app with LightekMCG-marlon
+
+```git
+git clone git@github.com:Mrlightek/LightekMCG-server.git
+```
+Private repo, so ssh token needs to be added to the repo first for clone to be successful
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake test` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
 
