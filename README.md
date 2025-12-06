@@ -20,8 +20,15 @@ TODO: Replace `UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_O
 Install the gem and add to the application's Gemfile by executing:
 
 ```bash
-bundle add UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
+bundle add marlon
 ```
+
+Gem is already bundled into LightekMCG-server so just clone that repo, bare metal rails app with LightekMCG-marlon
+
+```git
+git clone git@github.com:Mrlightek/LightekMCG-server.git
+```
+Private repo, so ssh token needs to be added to the repo first for clone to be successful
 
 If bundler is not being used to manage dependencies, install the gem by executing:
 
@@ -30,6 +37,23 @@ gem install UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
 ```
 
 ## Usage
+
+CLI:
+
+```pgsql
+marlon g service CreateUser
+marlon g model User name:string age:integer
+marlon g install
+marlon new my_component
+```
+
+APP GENERATOR:
+
+```pgsql
+marlon new my_framework_extension
+```
+
+Creates a new MARLON-based gem or service.
 
 TODO: Write usage instructions here
 
