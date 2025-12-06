@@ -10,6 +10,7 @@ module Marlon
       def generate
         create_initializer
         create_config
+        create_services
       end
 
       def create_initializer
@@ -30,6 +31,17 @@ module Marlon
           debug: false
         YAML
         puts "Created #{path}"
+      end
+
+      def create_service
+        path = "config/initializers/marlon.rb"
+        FileUtils.mkdir_p(File.dirname(path))
+        File.write(path, <<~RUBY)
+          # MARLON Framework Initialization
+          Marlon.boot!
+        RUBY
+        puts "Created #{path}"
+        
       end
     end
   end
