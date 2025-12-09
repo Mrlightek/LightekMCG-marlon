@@ -1,0 +1,1 @@
+Marlon::Router.map("<%= route_name %>", Marlon::Services::<%= class_name %>)

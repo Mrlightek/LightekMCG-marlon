@@ -2,24 +2,52 @@
 # frozen_string_literal: true
 
 require "zeitwerk"
+require "yaml"
 require "fileutils"
+require "active_support"
+require "active_support/core_ext/hash/indifferent_access"
+require "active_support/security_utils"
 
 require_relative "marlon/version"
 
 module Marlon
   class << self
     def loader
-      @loader ||= Zeitwerk::Loader.for_gem.tap do |l|
-        l.inflector.inflect("mcg" => "MCG") if l.respond_to?(:inflector)
-        l.setup
-      end
+      return @loader if @loader
+      @loader = Zeitwerk::Loader.new
+      @loader.push_dir(File.expand_path("..", __dir__)) # lib/
+      @loader.setup
+      @loader
     end
 
     def boot!
       loader
     end
 
-    # route convenience
+    def root
+      File.expand_path("..", __dir__)
+    end
+
+    def config
+      @config ||= load_config
+    end
+
+    def load_config
+      path = File.join(Dir.pwd, "config", "marlon.yml")
+      if File.exist?(path)
+        YAML.load_file(path).with_indifferent_access
+      else
+        {}.with_indifferent_access
+      end
+    rescue => e
+      warn "[MARLON] failed to load config: #{e}"
+      {}.with_indifferent_access
+    end
+
+    def reload_config!
+      @config = load_config
+    end
+
     def route(payload)
       Router.route(payload)
     end

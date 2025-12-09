@@ -1,47 +1,56 @@
 # lib/marlon/cli.rb
 require "thor"
-require "fileutils"
+require_relative "installer"
+require_relative "server"
+require_relative "generators"
+require_relative "systemd_manager"
+require_relative "activerecord_adapter"
 
 module Marlon
   class CLI < Thor
-    desc "g GENERATOR NAME [fields...]", "Generate files: service, model, gatekeeper, router, install, framework"
-    def g(generator, name = nil, *fields)
-      generator = generator.to_s.downcase
-      case generator
-      when "service"
-        ensure_name!(name)
-        Generators::ServiceGenerator.new(name).generate
-      when "model"
-        ensure_name!(name)
-        Generators::ModelGenerator.new(name, fields).generate
-      when "gatekeeper"
-        Generators::GatekeeperGenerator.new.generate
-      when "router"
-        Generators::RouterGenerator.new.generate
-      when "install"
-        Generators::InstallGenerator.new.generate
-      when "framework"
-        ensure_name!(name)
-        Generators::FrameworkGenerator.new(name).generate
-      else
-        puts "Unknown generator: #{generator}"
+    package_name "marlon"
+
+    desc "install", "Install marlon into current project"
+    def install
+      Installer.new.run
+    end
+
+    desc "server [PORT]", "Start Falcon HTTP server"
+    option :bind, aliases: "-b", default: "0.0.0.0"
+    def server(port = 3000)
+      # establish AR if configured
+      if File.exist?(File.join(Dir.pwd, "config", "database.yml"))
+        ActiveRecordAdapter.establish_connection
+      end
+
+      Reactor.start do
+        Server.start(bind: options[:bind], port: port.to_i)
       end
     end
 
-    desc "new-framework NAME", "Create a complete MARLON gem scaffold (alias for g framework NAME)"
-    def new_framework(name)
-      Generators::FrameworkGenerator.new(name).generate
+    desc "g [GENERATOR] [NAME] ...", "Run generators (service, scaffold, migration, payload_router, systemd, proxy)"
+    def g(generator = nil, name = nil, *args)
+      if generator.nil?
+        puts "Available generators: service, scaffold, migration, payload_router, systemd, proxy"
+        return
+      end
+      Generators.exec(generator, name, *args)
     end
 
-    desc "version", "Show MARLON version"
+    desc "systemd install NAME", "Install & enable systemd unit for service (requires sudo). Use --deploy to auto move/install."
+    method_option :deploy, type: :boolean, default: false
+    def systemd(action = nil, name = nil)
+      if action == "install" && name
+        gen = Generators::SystemdGenerator.new(name)
+        gen.generate(deploy: options[:deploy])
+      else
+        puts "Usage: marlon systemd install NAME [--deploy]"
+      end
+    end
+
+    desc "version", "Show marlon version"
     def version
       puts Marlon::VERSION
-    end
-
-    private
-
-    def ensure_name!(name)
-      raise Thor::Error, "You must provide a NAME" unless name
     end
   end
 end

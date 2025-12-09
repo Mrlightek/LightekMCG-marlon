@@ -1,102 +1,392 @@
-# Marlon
+MARLON
 
-Welcome to Marlon.
+The Official Ruby Framework of Lightek Media & Communications Group, Inc.
+
+A Standalone, OS-Level, Reactive Service Framework
+
+Fully proprietary. Fully Lightek.
+
+No Rails. No Sinatra. No dependencies.
+
+Just MARLON.
 
 Machines
-Actively 
+Actively
 Routing
 Lightek's
 Orchestration
 Network
 
-TODO: Delete this and the text below, and describe your gem
+🚀 What MARLON Is
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/marlon`. To experiment with that code, run `bin/console` for an interactive prompt.
+Marlon is Lightek’s flagship Ruby application framework, purpose-built for:
 
-## Installation
 
-TODO: Replace `UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG` with your gem name right after releasing it to RubyGems.org. Please do not do it earlier due to security reasons. Alternatively, replace this section with instructions to install your gem from git if you don't plan to release to RubyGems.org.
+✔ Telecom-scale services
 
-Install the gem and add to the application's Gemfile by executing:
+✔ Systemd-native background workers
+
+✔ High-performance reactive networking
+
+✔ Gatekeeper-secured payload processing
+
+✔ Server-driven UI for mobile clients
+
+✔ Enterprise proxying & service routing
+
+✔ Zero dependency on Rails or any other framework
+
+Marlon is the foundation of the entire Lightek ecosystem.
+
+This is our internal framework for:
+
+Real-time VoIP
+
+VR/AR app rendering
+
+Media operations
+
+Authentication
+
+Routing
+
+Distributed services
+
+Thin-client mobile UI generation
+
+🔥 Startup Flow
+
+When any MARLON application boots:
+
+Load config/marlon.yml
+
+Load environment variables
+
+Initialize ActiveRecord (optional, if enabled)
+
+Load services
+
+Load routers
+
+Boot the MARLON Reactor
+
+Start Falcon HTTP/WebSocket server
+
+Load Reverse Proxy subsystem
+
+Start systemd-managed background services
+
+Begin dispatching requests into the Gatekeeper → Router → Service pipeline
+
+Marlon apps run as first-class OS services, not "web apps."
+
+🛰 Marlon Server Engine (“Lightek Reactor”)
+
+Real features:
+
+⚡ High-Performance Reactor
+
+Based on Falcon fiber scheduler
+
+No Rails middleware
+
+Zero-blocking async pipeline
+
+Multi-threaded & multi-worker support
+
+🛰 Native WebSocket Core
+
+Bi-directional messaging
+
+Gateway integration
+
+Reactive service channels
+
+🔁 Industrial Reverse Proxy Layer
+
+Load balancing
+
+Failover
+
+Circuit breakers
+
+Rate limiting
+
+Static asset caching
+
+Header rewriting
+
+URL rewriting
+
+SSL termination
+
+WebSocket pass-through
+
+Hot reload proxy rules
+
+🧩 Pluggable Middleware
+
+Drop files in app/middleware/ — instantly active.
+
+🔧 Configurable Worker Model
+
+Forked workers
+
+Thread pools
+
+Async job runners
+
+🛂 Gatekeeper Controller
+
+The One Controller to Rule Them All.
+
+Marlon has one and only one controller:
+
+Gatekeeper
+
+Everything—every request—passes through Gatekeeper:
+
+Authentication
+
+Permission validation
+
+Payload verification
+
+Token decryption
+
+Signature validation
+
+Rate enforcement
+
+Payload → Router → Service dispatch
+
+Response normalization
+
+Acts as our API Gateway, our Security Boundary, and our App Router entrypoint.
+
+🧭 Payload Router
+
+The Payload Router transforms your JSON packets into service calls:
+
+```json
+POST /marlon/gatekeeper
+{
+  "service": "UserCreator",
+  "action": "create",
+  "payload": { ... }
+}
+
+```
+
+Dispatches to:
+
+```bash
+services/user_creator.rb
+```
+
+Routers are miniature orchestrators:
+
+```ruby
+route "users.create", to: Services::UserCreator
+route "profile.show", to: Services::ProfileShow
+```
+
+You can generate routers via:
+
+```nginx
+marlon g router AccountsRouter
+```
+
+📱 Marlon UI Schema
+
+Server-Driven UI for Mobile & VR Clients
+
+This is the Lightek secret weapon.
+
+Your services now generate UI definitions:
+
+```ruby
+{
+  ui: ui_schema do
+    text "Welcome, #{user.name}"
+    button "View Profile", action: "profile.show"
+    list collection: @items do
+      text :title
+      text :subtitle
+    end
+  end
+}
+```
+
+Devices (iOS, Flutter, VR, Web) receive:
+Component tree
+Layout
+Actions
+Forms
+Styling/theme
+Live reload capability
+No need to update mobile apps when UI changes.
+Marlon is the universal renderer.
+
+
+🛠 Generators
+
+Marlon comes with Rails-level generation power — but Marlon-native.
+
+Core Generators
+
+```cpp
+marlon new my_app
+marlon install
+```
+
+Service
+
+```nginx
+marlon g service UserCreator
+```
+
+Router
+
+```nginx
+marlon g router AccountsRouter
+```
+
+Gatekeeper
+
+```nginx
+marlon g gatekeeper
+```
+
+Scaffold
+
+```sql
+marlon g scaffold User
+```
+
+Creates:
+
+Service
+
+Router
+
+Migration
+
+Systemd unit (optional)
+
+UI Schema file
+
+Test suite
+
+Migrations / Database
+
+```sql
+marlon g migration CreateUsers
+marlon db:migrate
+marlon db:rollback
+```
+
+Uses ActiveRecord internally if enabled.
+
+Systemd
+
+```css
+marlon g systemd OrderProcessor
+marlon systemd install OrderProcessor --force
+```
+
+Includes:
+
+Unit file creation
+
+Auto-copy to /etc/systemd/system
+
+systemctl reload
+
+systemctl enable/start
+
+Reverse Proxy Rules
+
+```nginx
+marlon g proxy_rules
+```
+
+⚙ Runtime Commands
+
+Just like Rails, but MARLON-native:
+
+```pgsql
+marlon start
+marlon stop
+marlon restart
+marlon console
+marlon logs
+marlon routes
+```
+
+🛡 Deployment Model
+
+Local Development
+
+Runs without sudo.
+
+Systemd units generated but not installed.
+
+QA / Production
+
+Systemd-managed everything
+
+Blue/green deployments
+
+Rolling restarts
+
+Zero downtime reloads
+
+Multi-worker Reactor cluster
+
+Reverse proxy hot-reload
+
+📦 Installation
+
+Add to Gemfile:
 
 ```bash
 bundle add marlon
 ```
 
-Marlon install:
+Then:
 
 ```bash
-marlon g install
+marlon install
 ```
 
-If bundler is not being used to manage dependencies, install the gem by executing:
+Or from RubyGems:
 
 ```bash
-gem install UPDATE_WITH_YOUR_GEM_NAME_IMMEDIATELY_AFTER_RELEASE_TO_RUBYGEMS_ORG
+gem install marlon
 ```
 
-## Usage
+⚡ Quickstart
 
-CLI:
-
-```pgsql
+```bash
+mkdir my_app && cd my_app
+bundle init
+bundle add marlon
+marlon install
 marlon g service CreateUser
-marlon g model User name:string age:integer
-marlon g install
-marlon new my_component
+marlon server
 ```
 
-APP GENERATOR:
+🤝 Contributing
 
-```pgsql
-marlon new my_framework_extension
-```
+Private Lightek repo.
 
-Creates a new MARLON-based gem or service.
+Issue tracking and contributions remain internal.
 
-Usage examples:
+📜 License
 
-After you bundle install and rake gem:install (or use the installer below), you can:
+MIT License.
 
-```bash
-# generate a service
-marlon g service CreateUser
-# generate a model
-marlon g model User name:string age:integer
-# create gatekeeper controller and insert route
-marlon g gatekeeper
-# overwrite router with more advanced router
-marlon g router
-# install into a Rails/Lightek app (creates config/initializers/marlon.rb and config/marlon.yml)
-marlon g install
-# create a complete marlon-backed gem scaffold
-marlon g framework my_component
+🧭 Code of Conduct
 
-```
-
-TODO: Write usage instructions here
-
-## Development
-
-Gem is already bundled into LightekMCG-server so just clone that repo, bare metal rails app with LightekMCG-marlon
-
-```git
-git clone git@github.com:Mrlightek/LightekMCG-server.git
-```
-Private repo, so ssh token needs to be added to the repo first for clone to be successful
-
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake test` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
-
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and the created tag, and push the `.gem` file to [rubygems.org](https://rubygems.org).
-
-## Contributing
-
-Bug reports and pull requests are welcome on GitHub at https://github.com/Mrlightek/LightekMCG-marlon. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [code of conduct](https://github.com/Mrlightek/LightekMCG-marlon/blob/master/CODE_OF_CONDUCT.md).
-
-## License
-
-The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
-
-## Code of Conduct
-
-Everyone interacting in the Marlon project's codebases, issue trackers, chat rooms and mailing lists is expected to follow the [code of conduct](https://github.com/Mrlightek/LightekMCG-marlon/blob/master/CODE_OF_CONDUCT.md).
+Standard Lightek guidelines apply.

@@ -1,0 +1,46 @@
+# app/gatekeeper.rb
+require "json"
+require "marlon"
+
+class GatekeeperApp
+  def call(env)
+    req = Rack::Request.new(env)
+    if req.post?
+      body = req.body.read
+      payload = parse_body(body, req)
+      token = req.get_header("HTTP_X_MARLON_TOKEN") || payload["token"]
+      expected = Marlon.config.dig("gatekeeper", "token") || "change_me"
+      if secure_compare(token.to_s, expected.to_s)
+        begin
+          result = Marlon.route(symbolize_keys(payload))
+          return [200, { "Content-Type" => "application/json" }, [ { success: true, result: result }.to_json ]]
+        rescue => e
+          return [422, { "Content-Type" => "application/json" }, [ { error: e.message }.to_json ]]
+        end
+      else
+        return [401, { "Content-Type" => "application/json" }, [ { error: "unauthorized" }.to_json ]]
+      end
+    else
+      [404, { "Content-Type" => "application/json" }, [ { error: "not_found" }.to_json ]]
+    end
+  end
+
+  private
+
+  def parse_body(body, req)
+    return {} if body.nil? || body.strip.empty?
+    JSON.parse(body) rescue req.params
+  end
+
+  def symbolize_keys(h)
+    return h unless h.is_a?(Hash)
+    h.each_with_object({}) { |(k,v),o| o[k.to_sym] = v.is_a?(Hash) ? symbolize_keys(v) : v }
+  end
+
+  def secure_compare(a, b)
+    return false if a.nil? || b.nil?
+    ActiveSupport::SecurityUtils.secure_compare(a.to_s, b.to_s)
+  rescue
+    false
+  end
+end
