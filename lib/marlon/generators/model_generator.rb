@@ -15,7 +15,6 @@ module Marlon
         attribute_definitions = @fields.map do |f|
           name, type = f.split(":")
           type ||= "string"
-
           case type
           when "references", "reference"
             "  reference :#{name}"
@@ -29,7 +28,7 @@ module Marlon
         end
 
         content = render("model.rb.tt", class_name: @class_name, attributes: attribute_definitions.join("\n"))
-        path = "lib/marlon/models/#{@file_name}.rb"
+        path = File.join(Dir.pwd, "lib", "marlon", "models", "#{@file_name}.rb")
         write_file(path, content)
       end
 
