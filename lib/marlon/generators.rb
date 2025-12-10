@@ -1,11 +1,11 @@
 # lib/marlon/generators.rb
-require_relative "marlon/generators/base_generator"
-require_relative "marlon/generators/service_generator"
-require_relative "marlon/generators/scaffold_generator"
-require_relative "marlon/generators/migration_generator"
-require_relative "marlon/generators/payload_router_generator"
-require_relative "marlon/generators/systemd_generator"
-require_relative "marlon/generators/proxy_generator"
+require_relative "generators/base_generator"
+require_relative "generators/service_generator"
+require_relative "generators/scaffold_generator"
+require_relative "generators/migration_generator"
+require_relative "generators/payload_router_generator"
+require_relative "generators/systemd_generator"
+require_relative "generators/proxy_generator"
 
 module Marlon
   module Generators
