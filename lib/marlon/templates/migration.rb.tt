@@ -25,6 +25,8 @@ class <%= class_name %>
             "CREATE TABLE IF NOT EXISTS #{table_name} (#{sql_columns}, PRIMARY KEY(id))"
           when :postgres
             "CREATE TABLE IF NOT EXISTS \"#{table_name}\" (#{sql_columns}, PRIMARY KEY(id))"
+          else
+            raise 'No DB adapter'
           end
 
     Marlon::DB.connection.execute(sql)
