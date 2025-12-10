@@ -9,11 +9,11 @@ module Marlon
 
     def self.load_config
       return {} unless File.exist?(CONFIG_PATH)
-      YAML.load(ERB.new(File.read(CONFIG_PATH)).result)
+      YAML.load(ERB.new(File.read(CONFIG_PATH)).result) || {}
     end
 
     def self.establish_connection(env = ENV["MARLON_ENV"] || "development")
-      cfg = load_config[env]
+      cfg = load_config[env.to_s]
       raise "[MARLON] No DB config for env '#{env}'" unless cfg
       cfg_sym = cfg.transform_keys(&:to_sym)
       adapter = (cfg_sym[:adapter] || :sqlite).to_sym
@@ -22,4 +22,3 @@ module Marlon
     end
   end
 end
-
