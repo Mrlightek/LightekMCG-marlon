@@ -278,19 +278,17 @@ UI Schema file
 
 Test suite
 
-Migrations / Database
+### Migrations / Database (NEW!)
 
-```sql
+```bash
 marlon g migration CreateUsers
 marlon db:migrate
 marlon db:rollback
 ```
 
-Uses ActiveRecord internally if enabled.
-
 Systemd
 
-```css
+```bash
 marlon g systemd OrderProcessor
 marlon systemd install OrderProcessor --force
 ```
@@ -315,7 +313,7 @@ marlon g proxy_rules
 
 Just like Rails, but MARLON-native:
 
-```pgsql
+```bash
 marlon start
 marlon stop
 marlon restart
