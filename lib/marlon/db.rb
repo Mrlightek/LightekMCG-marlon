@@ -11,31 +11,26 @@ module Marlon
     class << self
       attr_reader :adapter
 
-      def connect(name, adapter:, **opts)
-        case adapter
+      def connect(name = :main, adapter:, **opts)
+        case adapter.to_sym
         when :sqlite
           conn = SQLite3::Database.new(opts[:file] || "#{name}.db")
           conn.results_as_hash = true
-        when :postgres
-          conn = PG.connect(
-            dbname: opts[:db] || "marlon",
-            host: opts[:host] || "localhost",
-            user: opts[:user] || ENV["USER"],
-            password: opts[:password] || ""
-          )
+          @connections[name] = conn
+          @adapter = :sqlite
+        when :postgres, :pg
+          conn = PG.connect(dbname: opts[:db] || "marlon", host: opts[:host], user: opts[:user], password: opts[:password])
+          @connections[name] = conn
+          @adapter = :postgres
         else
-          raise "Adapter #{adapter} not implemented"
+          raise "Unknown adapter #{adapter}"
         end
-
-        @connections[name] = conn
-        @adapter = adapter
       end
 
       def connection(name = :main)
         @connections[name] || raise("No DB connection named #{name}")
       end
 
-      # Ensure table exists with provided columns (simple types)
       def ensure_table(table, columns)
         case @adapter
         when :sqlite
@@ -46,6 +41,8 @@ module Marlon
           conn = connection
           cols_sql = columns.map { |k, t| %("#{k}" #{sql_type_postgres(t)}) }.join(", ")
           conn.exec("CREATE TABLE IF NOT EXISTS \"#{table}\" (#{cols_sql}, PRIMARY KEY(id))")
+        else
+          raise "No adapter connected"
         end
       end
 
@@ -71,23 +68,19 @@ module Marlon
         end
       end
 
-      # Upsert/save record
+      # Upsert/save
       def save(table, data, conn_name = :main)
         case @adapter
         when :sqlite
           conn = connection(conn_name)
-          # Ensure table columns exist for keys
-          cols = data.keys.map { |k| [k.to_s, :string] }.to_h
-          ensure_table(table, cols)
-
+          # ensure columns exist - simple, may be expanded to ALTER TABLE
+          ensure_table(table, data.keys.map { |k| [k, :string] }.to_h)
           columns = data.keys.join(", ")
           placeholders = (["?"] * data.keys.length).join(", ")
-          # Use INSERT OR REPLACE to upsert by primary key
           sql = "INSERT OR REPLACE INTO #{table} (#{columns}) VALUES (#{placeholders})"
           conn.execute(sql, data.values)
         when :postgres
           conn = connection(conn_name)
-          # Ensure table exists — caller should ensure but keep simple
           columns = data.keys.map { |k| %("#{k}") }.join(", ")
           placeholders = data.keys.each_with_index.map { |_, i| "$#{i + 1}" }.join(", ")
           update_clause = data.keys.map { |k| %("#{k}" = EXCLUDED."#{k}") }.join(", ")
@@ -97,10 +90,11 @@ module Marlon
             ON CONFLICT (id) DO UPDATE SET #{update_clause}
           SQL
           conn.exec_params(sql, data.values)
+        else
+          raise "No adapter"
         end
       end
 
-      # Find by id
       def find(table, id, conn_name = :main)
         case @adapter
         when :sqlite
@@ -114,7 +108,6 @@ module Marlon
         end
       end
 
-      # Simple where (AND conditions only)
       def where(table, conditions = {}, conn_name = :main)
         case @adapter
         when :sqlite
@@ -149,8 +142,7 @@ module Marlon
         when :postgres
           conn = connection(conn_name)
           set_clause = data.keys.each_with_index.map { |k, i| %("#{k}" = $#{i + 2}) }.join(", ")
-          sql = "UPDATE \"#{table}\" SET #{set_clause} WHERE id = $1"
-          conn.exec_params(sql, [id] + data.values)
+          conn.exec_params("UPDATE \"#{table}\" SET #{set_clause} WHERE id = $1", [id] + data.values)
         end
       end
 
