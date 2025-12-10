@@ -1,10 +1,32 @@
-class <%= class_name %> < ActiveRecord::Migration[6.1]
-  def change
-    # example:
-    # create_table :users do |t|
-    #   t.string :name
-    #   t.string :email
-    #   t.timestamps
-    # end
+class <%= class_name %>
+  def self.up
+    table_name = "<%= table_name %>"
+
+    columns = {
+      "id" => :string,
+      "created_at" => :string,
+      "updated_at" => :string
+    }.merge(<%= columns.inspect %>)
+
+    sql_columns = columns.map do |name, type|
+      sql_type = case type
+                 when :string then "TEXT"
+                 when :integer then "INTEGER"
+                 when :float then "REAL"
+                 when :boolean then "BOOLEAN"
+                 when :json then "JSON"
+                 else "TEXT"
+                 end
+      "#{name} #{sql_type}"
+    end.join(", ")
+
+    sql = case Marlon::DB.adapter
+          when :sqlite
+            "CREATE TABLE IF NOT EXISTS #{table_name} (#{sql_columns}, PRIMARY KEY(id))"
+          when :postgres
+            "CREATE TABLE IF NOT EXISTS \"#{table_name}\" (#{sql_columns}, PRIMARY KEY(id))"
+          end
+
+    Marlon::DB.connection.execute(sql)
   end
 end

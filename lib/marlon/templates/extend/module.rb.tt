@@ -1,0 +1,9 @@
+# lib/<%= module_slug %>.rb
+require "marlon"
+
+module <%= module_name %>
+  def self.setup
+    # called by module install or marlon boot if desired
+    puts "[<%= module_name %>] setup"
+  end
+end

@@ -14,15 +14,15 @@ Gem::Specification.new do |spec|
   # runtime
   spec.add_dependency "thor"
   spec.add_dependency "zeitwerk"
-  spec.add_dependency "activesupport"
   spec.add_dependency "async"
   spec.add_dependency "falcon", "~> 0.31"
   spec.add_dependency "async-http"
   spec.add_dependency "async-websocket"
   spec.add_dependency "rack"
   spec.add_dependency "puma" # optional
-  spec.add_dependency "activerecord"
   # include a db adapter at host level as needed (pg/sqlite3/mysql2)
+  spec.add_dependency "sqlite3"
+  spec.add_dependency "pg"
 
   spec.add_development_dependency "rake"
   spec.add_development_dependency "rspec"

@@ -1,0 +1,10 @@
+development:
+  adapter: sqlite
+  file: db/dev.db
+
+production:
+  adapter: postgres
+  host: localhost
+  db: marlon
+  user: marlon
+  password: secret

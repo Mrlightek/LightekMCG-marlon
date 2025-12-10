@@ -1,0 +1,17 @@
+# app/marlon/modules/<%= module_slug %>/services/<%= module_slug %>_service.rb
+module Marlon
+  module Modules
+    module <%= module_name %>
+      class <%= module_name %>Service
+        def initialize(ctx = {})
+          @ctx = ctx
+        end
+
+        def call(payload)
+          # implement module-level operation
+          { module: "<%= module_name %>", payload: payload }
+        end
+      end
+    end
+  end
+end
