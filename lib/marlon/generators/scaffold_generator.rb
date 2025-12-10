@@ -21,7 +21,7 @@ module Marlon
         write_file(File.join(Dir.pwd, "app", "marlon", "payloads", "#{@file_name}_payload.rb"), payload)
 
         # migration
-        MigrationGenerator.new("create_#{@file_name.pluralize}").generate
+        MigrationGenerator.new("create_#{Marlon::Inflector.pluralize(@file_name)}").generate
 
         # router entry
         entry = "Marlon::Router.map(\"#{@file_name}\", Marlon::Services::#{@class_name}Service)\n"
