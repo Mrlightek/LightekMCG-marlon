@@ -8,7 +8,7 @@ module Marlon
         raise "Name required" unless name
         @name = name
         @class_name = Marlon::Inflector.camelize(name)
-        @file_name = name.gsub(/([A-Z])/, '_\1').sub(/^_/, '').downcase
+        @file_name = Marlon::Inflector.underscore(name)
       end
 
       def generate
