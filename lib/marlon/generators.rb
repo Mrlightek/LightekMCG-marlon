@@ -25,6 +25,10 @@ module Marlon
         SystemdGenerator.new(name).generate(*args)
       when "proxy"
         ProxyGenerator.new.generate
+      when "model"
+        ModelGenerator.new(name, args).generate
+      when "router"
+        RouterGenerator.new.generate
       else
         puts "Unknown generator: #{cmd}"
       end
