@@ -7,7 +7,7 @@ module Marlon
       def initialize(name)
         raise "Name required" unless name
         @name = name
-        @class_name = name.split(/_|-/).map(&:capitalize).join
+        @class_name = Marlon::Inflector.camelize(name)
         @file_name = name.gsub(/([A-Z])/, '_\1').sub(/^_/, '').downcase
       end
 
