@@ -12,11 +12,23 @@ module Marlon
       end
 
       def generate
-        attributes = @fields.map do |f|
+        attribute_definitions = @fields.map do |f|
           name, type = f.split(":")
-          "  attribute :#{name}, :#{(type || 'string')}"
-        end.join("\n")
-        content = render("model.rb.tt", class_name: @class_name, attributes: attributes)
+          type ||= "string"
+
+          case type
+          when "references", "reference"
+            "  reference :#{name}"
+          when "attachment"
+            "  attachment :#{name}"
+          when "attachments"
+            "  attachments :#{name}"
+          else
+            "  attribute :#{name}, type: :#{type}, default: nil"
+          end
+        end
+
+        content = render("model.rb.tt", class_name: @class_name, attributes: attribute_definitions.join("\n"))
         path = "lib/marlon/models/#{@file_name}.rb"
         write_file(path, content)
       end

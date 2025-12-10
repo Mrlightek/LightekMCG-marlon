@@ -1,0 +1,17 @@
+module Marlon
+  module Payloads
+    class <%= class_name %>
+      def initialize(input)
+        @input = input
+      end
+
+      def validate
+        true
+      end
+
+      def to_h
+        @input
+      end
+    end
+  end
+end

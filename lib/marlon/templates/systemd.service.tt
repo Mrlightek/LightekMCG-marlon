@@ -1,0 +1,15 @@
+[Unit]
+Description=Marlon Service: <%= unit_name %>
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=<%= exec %>
+Restart=always
+User=<%= ENV['SUDO_USER'] || 'www-data' %>
+Environment=MARLON_ENV=production
+WorkingDirectory=<%= Dir.pwd %>
+
+[Install]
+WantedBy=multi-user.target
+

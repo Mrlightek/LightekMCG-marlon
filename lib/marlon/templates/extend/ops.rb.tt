@@ -1,0 +1,18 @@
+# app/marlon/modules/<%= module_slug %>/ops.rb
+module Marlon
+  module Modules
+    module <%= module_name %>
+      module Ops
+        # Example operations that Gatekeeper will call:
+        # " <%= module_slug %>.create_resource "
+        def self.register_routes
+          Marlon::Router.map("<%= module_slug %>.create", Marlon::Modules::<%= module_name %>::<%= module_name %>Service)
+          Marlon::Router.map("<%= module_slug %>.status", proc { |payload| { ok: true, module: "<%= module_name %>" } })
+        end
+      end
+    end
+  end
+end
+
+# Auto-register at load time
+Marlon::Modules::<%= module_name %>::Ops.register_routes rescue nil

@@ -1,11 +1,9 @@
-mkdir -p exe
-cat > exe/marlon <<'RUBY'
 #!/usr/bin/env ruby
-# frozen_string_literal: true
+# exe/marlon
+# make executable: chmod +x exe/marlon
 
+require "bundler/setup" rescue nil
 require "marlon"
 require "marlon/cli"
 
 Marlon::CLI.start(ARGV)
-RUBY
-chmod +x exe/marlon

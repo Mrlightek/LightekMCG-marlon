@@ -1,4 +1,7 @@
 # lib/marlon/models/<%= class_name.downcase %>.rb
 class <%= class_name %> < Marlon::Model
+  # ATTRIBUTES START
 <%= attributes %>
+  # ATTRIBUTES END
 end
+

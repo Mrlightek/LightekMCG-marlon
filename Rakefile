@@ -1,6 +1,5 @@
 # Rakefile
 require "rake"
-require "rake/package_task"
 
 task :default do
   puts "Available tasks: gem:build, gem:install"

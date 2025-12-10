@@ -1,0 +1,3 @@
+# config/marlon_routes.rb
+# Module <%= module_name %> routes
+require_relative "../app/marlon/modules/<%= module_slug %>/ops.rb" rescue nil

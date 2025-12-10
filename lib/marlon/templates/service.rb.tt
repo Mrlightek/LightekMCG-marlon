@@ -1,10 +1,13 @@
-# lib/marlon/services/<%= file_name %>.rb
 module Marlon
   module Services
-    class <%= class_name %>Service < Marlon::Service
+    class <%= class_name %>
+      def initialize(context = {})
+        @context = context
+      end
+
       def call(payload)
-        # TODO: implement <%= class_name %>Service
-        puts "[MARLON] <%= class_name %>Service called with \#{payload.inspect}"
+        # implement business logic
+        { service: "<%= class_name %>", payload: payload }
       end
     end
   end
