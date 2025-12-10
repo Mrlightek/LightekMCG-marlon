@@ -1,128 +1,208 @@
 # lib/marlon/model.rb
 require "securerandom"
 require "json"
+require "fileutils"
+require "time"
 require_relative "db"
 require_relative "inflector"
+require_relative "blob" rescue nil # optional if blob exists
 
 module Marlon
+  class ValidationError < StandardError; end
+
   class Model
-    ############################################################
-    #                       CLASS API
-    ############################################################
-
-    def self.attributes
-      @attributes ||= {}
-    end
-
-    def self.references_defs
-      @references_defs ||= {}
-    end
-
-    def self.attachments_enabled?
-      true
-    end
-
-    # -------------------------------------------------------------------
-    # ATTRIBUTE
-    # -------------------------------------------------------------------
-    def self.attribute(name, type: :string, default: nil)
-      attributes[name] = { type: type, default: default }
-
-      define_method(name) do
-        @values ||= {}
-        @values.key?(name) ? @values[name] : default
+    class << self
+      # core attributes
+      def attributes
+        @attributes ||= {
+          id:         { type: :string, default: nil },
+          created_at: { type: :string, default: nil },
+          updated_at: { type: :string, default: nil }
+        }
       end
 
-      define_method("#{name}=") do |val|
-        @values ||= {}
-        @values[name] = type_cast(val, type)
+      def validations
+        @validations ||= []
+      end
+
+      def add_validation(attr, rules)
+        validations << { attr: attr.to_sym, rules: rules }
+      end
+
+      # DSL: validates :name, presence: true, numericality: true
+      def validates(attr, rules)
+        add_validation(attr, rules)
+      end
+
+      # Define attribute; defaults to :auto if not provided (type inference)
+      def attribute(name, type: :auto, default: nil)
+        name = name.to_sym
+        attributes[name] = { type: type, default: default }
+        define_attribute_accessors(name, type, default)
+      end
+
+      # belongs_to style
+      def reference(name)
+        fk = "#{name}_id".to_sym
+        attribute(fk, type: :string, default: nil)
+        define_method(name) do
+          ref_id = public_send(fk)
+          return nil unless ref_id
+          Object.const_get(name.to_s.capitalize).find(ref_id)
+        end
+
+        define_method("#{name}=") do |obj|
+          public_send("#{fk}=", obj&.id)
+        end
+      end
+
+      # has_many reverse
+      def has_many(name, class_name:, foreign_key:)
+        define_method(name) do
+          klass = Object.const_get(class_name)
+          klass.where(foreign_key => id)
+        end
+      end
+
+      # attachments / single & multiple
+      def attachment(name)
+        attribute("#{name}_blob_id".to_sym, type: :string)
+        define_method(name) do
+          blob_id = public_send("#{name}_blob_id")
+          blob_id ? Blob.find(blob_id) : nil
+        end
+        define_method("#{name}=") do |file|
+          blob = Blob.create_from_file(file, record_type: self.class.name, record_id: id, name: name.to_s)
+          public_send("#{name}_blob_id=", blob.id)
+        end
+      end
+
+      def attachments(name)
+        define_method(name) do
+          Blob.where(record_type: self.class.name, record_id: id, name: name.to_s)
+        end
+        define_method("#{name}=") do |files|
+          Array(files).each do |f|
+            Blob.create_from_file(f, record_type: self.class.name, record_id: id, name: name.to_s)
+          end
+        end
+      end
+
+      # Naming helpers
+      def table_name
+        Inflector.pluralize(Inflector.underscore(name))
+      end
+
+      # Ensure DB table exists
+      def ensure_table!
+        return if @table_created
+        Marlon::DB.ensure_table(table_name, attributes.transform_values { |v| v[:type] })
+        @table_created = true
+      end
+
+      # Simple caching (in-memory) for find()
+      def cache
+        @cache ||= {}
+      end
+
+      def cache_enabled?
+        !!@use_cache
+      end
+
+      def enable_cache!
+        @use_cache = true
+      end
+
+      def disable_cache!
+        @use_cache = false
+        @cache = {}
+      end
+
+      # find / where
+      def find(id)
+        ensure_table!
+        if cache_enabled? && cache[id]
+          return cache[id]
+        end
+        row = Marlon::DB.find(table_name, id)
+        model = row ? new(symbolize_row(row)) : nil
+        cache[id] = model if cache_enabled? && model
+        model
+      end
+
+      def where(conds = {})
+        ensure_table!
+        rows = Marlon::DB.where(table_name, conds)
+        rows.map { |r| new(symbolize_row(r)) }
+      end
+
+      private
+
+      def define_attribute_accessors(name, type, default)
+        define_method(name) do
+          @values ||= {}
+          if @values.key?(name.to_sym)
+            @values[name.to_sym]
+          else
+            default
+          end
+        end
+
+        define_method("#{name}=") do |val|
+          @values ||= {}
+          @values[name.to_sym] = self.class.infer_and_cast(val, type)
+        end
+      end
+
+      def symbolize_row(row)
+        # support sqlite (Hash) and PG row (Hash-like)
+        row.each_with_object({}) do |(k, v), memo|
+          memo[k.to_sym] = v
+        end
+      end
+
+      # Called by instances to coerce value
+      def infer_and_cast(value, declared_type)
+        t = declared_type || :auto
+        if t == :auto
+          inferred = infer_type(value)
+          return cast_by_type(value, inferred)
+        else
+          return cast_by_type(value, t)
+        end
+      end
+
+      # naive type inference
+      def infer_type(value)
+        return :json if value.is_a?(Hash) || value.is_a?(Array)
+        s = value.to_s.strip
+        return :boolean if s == "true" || s == "false" || value == true || value == false
+        return :integer if s.match?(/\A-?\d+\z/)
+        return :float if s.match?(/\A-?\d+\.\d+\z/)
+        return :json if s.start_with?("{") && s.end_with?("}") || s.start_with?("[") && s.end_with?("]")
+        :string
+      end
+
+      def cast_by_type(value, type)
+        return nil if value.nil?
+        case type
+        when :string  then value.to_s
+        when :integer then value.to_i
+        when :float   then value.to_f
+        when :boolean then !!value && value != "false"
+        when :json    then JSON.parse(value.to_s) rescue value
+        else value
+        end
       end
     end
 
-    # -------------------------------------------------------------------
-    # REFERENCES (belongs_to)
-    # -------------------------------------------------------------------
-    def self.references(name)
-      fk = "#{name}_id".to_sym
-      references_defs[name] = fk
-      attribute fk, type: :string, default: nil
-
-      define_method(name) do
-        ref_id = public_send(fk)
-        return nil unless ref_id
-        Object.const_get(name.to_s.capitalize).find(ref_id)
-      end
-
-      define_method("#{name}=") do |model|
-        public_send("#{fk}=", model&.id)
-      end
-    end
-
-
-    def self.reference(name)
-  attributes["#{name}_id".to_sym] = { type: :string, default: nil }
-
-  define_method(name) do
-    fk = public_send("#{name}_id")
-    return nil unless fk
-    Object.const_get(name.to_s.capitalize).find(fk)
-  end
-
-  define_method("#{name}=") do |obj|
-    public_send("#{name}_id=", obj.id)
-  end
-end
-
-
-    # -------------------------------------------------------------------
-    # HAS MANY (reverse relation)
-    # -------------------------------------------------------------------
-    def self.has_many(name, class_name:, foreign_key:)
-      define_method(name) do
-        klass = Object.const_get(class_name)
-        klass.where(foreign_key => id)
-      end
-    end
-
-    ############################################################
-    #                       AUTO TABLE CREATION
-    ############################################################
-
-    def self.ensure_table!
-      return if @table_created
-
-      cols = attributes.map do |name, opts|
-        sql_type = case opts[:type]
-                   when :string then "TEXT"
-                   when :integer then "INTEGER"
-                   when :float then "REAL"
-                   when :boolean then "BOOLEAN"
-                   when :json then "JSON"
-                   else "TEXT"
-                   end
-        "#{name} #{sql_type}"
-      end
-
-      sql = case Marlon::DB.adapter
-            when :sqlite
-              "CREATE TABLE IF NOT EXISTS #{name} (#{cols.join(",")}, PRIMARY KEY(id))"
-            when :postgres
-              "CREATE TABLE IF NOT EXISTS \"#{name}\" (#{cols.join(",")}, PRIMARY KEY(id))"
-            end
-
-      conn = Marlon::DB.connection
-      Marlon::DB.adapter == :postgres ? conn.exec(sql) : conn.execute(sql)
-
-      @table_created = true
-    end
-
-    ############################################################
-    #                       INSTANCE API
-    ############################################################
-
+    # instance API ----------------------------------------------------
     def initialize(params = {})
       @values = {}
-      params.each { |k, v| public_send("#{k}=", v) if respond_to?("#{k}=") }
+      params.each do |k, v|
+        setter = "#{k}="
+        public_send(setter, v) if respond_to?(setter)
+      end
       @values[:id] ||= SecureRandom.uuid
     end
 
@@ -130,123 +210,70 @@ end
       @values[:id]
     end
 
-    # -------------------------------------------------------------------
-    # SAVE
-    # -------------------------------------------------------------------
-    def save
-      now = Time.now.utc.to_s
+    def to_h
+      # freeze shape: string keys to match DB expectations
+      self.class.attributes.keys.map { |k| [k.to_s, public_send(k)] }.to_h
+    end
+
+    # validations runner returns boolean, fills errors
+    def valid?
+      @errors = []
+      self.class.validations.each do |v|
+        val = public_send(v[:attr])
+        rules = v[:rules]
+        if rules[:presence] && (val.nil? || (val.respond_to?(:to_s) && val.to_s.strip.empty?))
+          @errors << "#{v[:attr]} must be present"
+        end
+        if rules[:numericality] && !(val.to_s =~ /\A-?\d+(\.\d+)?\z/)
+          @errors << "#{v[:attr]} must be numeric"
+        end
+        if rules[:format] && !(val.to_s =~ rules[:format])
+          @errors << "#{v[:attr]} is invalid"
+        end
+        if rules[:inclusion] && !rules[:inclusion].include?(val)
+          @errors << "#{v[:attr]} is not included in list"
+        end
+      end
+      @errors.empty?
+    end
+
+    def errors
+      @errors || []
+    end
+
+    # Save with validation
+    def save(validate: true)
+      if validate && !valid?
+        raise ValidationError, errors.join("; ")
+      end
+
+      now = Time.now.utc.iso8601
       @values[:created_at] ||= now
       @values[:updated_at] = now
 
       self.class.ensure_table!
-      Marlon::DB.save(self.class.name, to_h)
+
+      data = to_h
+      Marlon::DB.save(self.class.table_name, data)
+
+      # cache invalidate/update
+      if self.class.cache_enabled?
+        self.class.cache[id] = self
+      end
 
       persist_attributes_to_file
       self
     end
 
-    # -------------------------------------------------------------------
-    # DELETE
-    # -------------------------------------------------------------------
     def delete
-      Marlon::DB.delete(self.class.name, id)
+      Marlon::DB.delete(self.class.table_name, id)
+      self.class.cache.delete(id) if self.class.cache_enabled?
+      true
     end
-
-    # -------------------------------------------------------------------
-    # TO HASH
-    # -------------------------------------------------------------------
-    def to_h
-      self.class.attributes.keys.index_with do |key|
-        public_send(key)
-      end.merge(id: id)
-    end
-
-    ############################################################
-    #                       CLASS QUERY API
-    ############################################################
-
-    def self.find(id)
-      ensure_table!
-      row = Marlon::DB.find(name, id)
-      row ? new(row) : nil
-    end
-
-    def self.where(conditions)
-      ensure_table!
-      rows = Marlon::DB.where(name, conditions)
-      rows.map { |row| new(row) }
-    end
-
-    ############################################################
-    #                       ATTACHMENTS
-    ############################################################
-
-    def attach(file_path)
-      FileUtils.mkdir_p("storage/#{self.class.name}/#{id}")
-      dest = "storage/#{self.class.name}/#{id}/#{File.basename(file_path)}"
-      FileUtils.cp(file_path, dest)
-    end
-
-    def attachments
-      path = "storage/#{self.class.name}/#{id}"
-      return [] unless Dir.exist?(path)
-      Dir.children(path).map { |f| "#{path}/#{f}" }
-    end
-
-    def self.attachment(name)
-  attributes["#{name}_blob_id".to_sym] = { type: :string, default: nil }
-
-  define_method(name) do
-    blob_id = public_send("#{name}_blob_id")
-    return nil unless blob_id
-    Marlon::Blob.find(blob_id)
-  end
-
-  define_method("#{name}=") do |file|
-    blob = Marlon::Blob.create_from_file(file)
-    public_send("#{name}_blob_id=", blob.id)
-  end
-end
-
-def self.attachments(name)
-  define_method(name) do
-    Marlon::Blob.where(record_type: self.class.name, record_id: id, name: name)
-  end
-
-  define_method("#{name}=") do |files|
-    Array(files).each do |file|
-      Marlon::Blob.create_from_file(
-        file,
-        record_type: self.class.name,
-        record_id: id,
-        name: name
-      )
-    end
-  end
-end
-
-
-    ############################################################
-    #                       INTERNAL
-    ############################################################
 
     private
 
-    def type_cast(value, type)
-      return nil if value.nil?
-      case type
-      when :string  then value.to_s
-      when :integer then value.to_i
-      when :float   then value.to_f
-      when :boolean then !!value
-      when :json    then JSON.parse(value.to_s) rescue value
-      else value
-      end
-    end
-
-    # -------------------------------------------------------------------
-    # PERSIST ATTRIBUTES BACK INTO MODEL FILE
-    # -------------------------------------------------------------------
+    # write attribute list into model file (markers)
     def persist_attributes_to_file
       model_file = File.join(Dir.pwd, "lib", "marlon", "models", "#{self.class.name.downcase}.rb")
       return unless File.exist?(model_file)
@@ -263,7 +290,7 @@ end
           content.sub(/# ATTRIBUTES START(.+?)# ATTRIBUTES END/m, new_block)
         else
           content.sub(/class #{self.class.name} < Marlon::Model/) do |match|
-            "#{match}\n#{new_block}"
+            "#{match}\n  #{new_block}\n"
           end
         end
 

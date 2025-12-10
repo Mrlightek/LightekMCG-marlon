@@ -4,7 +4,9 @@ require_relative "installer"
 require_relative "server"
 require_relative "generators"
 require_relative "systemd_manager"
-require_relative "activerecord_adapter"
+require_relative "db_adapter"
+require_relative "migrator"
+require_relative "migration_runner" rescue nil
 
 module Marlon
   class CLI < Thor
@@ -18,34 +20,50 @@ module Marlon
     desc "server [PORT]", "Start Falcon HTTP server"
     option :bind, aliases: "-b", default: "0.0.0.0"
     def server(port = 3000)
-      # establish AR if configured
-      if File.exist?(File.join(Dir.pwd, "config", "database.yml"))
-        ActiveRecordAdapter.establish_connection
-      end
-
+      DBAdapter.establish_connection if File.exist?(File.join(Dir.pwd, "config", "database.yml"))
       Reactor.start do
         Server.start(bind: options[:bind], port: port.to_i)
       end
     end
 
-    desc "g [GENERATOR] [NAME] ...", "Run generators (service, scaffold, migration, payload_router, systemd, proxy)"
+    desc "g [GENERATOR] [NAME] ...", "Run generators (model, migration, scaffold, service, systemd, proxy)"
     def g(generator = nil, name = nil, *args)
       if generator.nil?
-        puts "Available generators: service, scaffold, migration, payload_router, systemd, proxy"
+        puts "Available generators: model, migration, scaffold, service, systemd, proxy"
         return
       end
       Generators.exec(generator, name, *args)
     end
 
-    desc "systemd install NAME", "Install & enable systemd unit for service (requires sudo). Use --deploy to auto move/install."
-    method_option :deploy, type: :boolean, default: false
-    def systemd(action = nil, name = nil)
-      if action == "install" && name
-        gen = Generators::SystemdGenerator.new(name)
-        gen.generate(deploy: options[:deploy])
-      else
-        puts "Usage: marlon systemd install NAME [--deploy]"
-      end
+    desc "generate:model NAME [fields...]", "Generate a model. fields: title:string user:references"
+    def generate_model(name, *fields)
+      Generators::ModelGenerator.new(name, fields).generate
+    end
+
+    desc "generate:migration NAME", "Generate a migration. Uses model attributes if model exists."
+    def generate_migration(name)
+      Generators::MigrationGenerator.new(name).generate
+    end
+
+    desc "db:setup", "Establish DB connection and run migrations"
+    def db_setup
+      DBAdapter.establish_connection
+      Migrator.new.run
+    end
+
+    desc "db:migrate", "Run pending migrations"
+    def db_migrate
+      DBAdapter.establish_connection
+      Migrator.new.run
+    end
+
+    desc "console", "Start interactive Marlon console (loads models and DB)"
+    def console
+      DBAdapter.establish_connection if File.exist?(File.join(Dir.pwd, "config", "database.yml"))
+      Dir[File.join(Dir.pwd, "lib", "marlon", "models", "*.rb")].each { |f| require f }
+      require "irb"
+      ARGV.clear
+      IRB.start
     end
 
     desc "version", "Show marlon version"

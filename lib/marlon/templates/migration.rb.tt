@@ -1,32 +1,66 @@
+# db/migrate/<%= class_name.downcase %>.rb
 class <%= class_name %>
-  def self.up
-    table_name = "<%= table_name %>"
+  def up
+    # Example DSL usage:
+    # create_table :users do |t|
+    #   t.string :name, null: false, default: "Anonymous"
+    #   t.integer :age
+    #   t.boolean :active, default: true
+    #   t.json :metadata
+    #   t.timestamps
+    #   t.index :name
+    # end
+  end
 
-    columns = {
-      "id" => :string,
-      "created_at" => :string,
-      "updated_at" => :string
-    }.merge(<%= columns.inspect %>)
+  def down
+    # Example rollback:
+    # drop_table :users
+  end
 
-    sql_columns = columns.map do |name, type|
-      sql_type = case type
-                 when :string then "TEXT"
-                 when :integer then "INTEGER"
-                 when :float then "REAL"
-                 when :boolean then "BOOLEAN"
-                 when :json then "JSON"
-                 else "TEXT"
-                 end
-      "#{name} #{sql_type}"
-    end.join(", ")
+  # DSL Helpers
+  class TableBuilder
+    attr_reader :name, :columns, :indexes
 
-    sql = case Marlon::DB.adapter
-          when :sqlite
-            "CREATE TABLE IF NOT EXISTS #{table_name} (#{sql_columns}, PRIMARY KEY(id))"
-          when :postgres
-            "CREATE TABLE IF NOT EXISTS \"#{table_name}\" (#{sql_columns}, PRIMARY KEY(id))"
-          end
+    def initialize(name)
+      @name = name
+      @columns = []
+      @indexes = []
+    end
 
-    Marlon::DB.connection.execute(sql)
+    %i[string integer boolean float decimal datetime json text].each do |type|
+      define_method(type) do |column_name, null: true, default: nil|
+        @columns << { name: column_name, type: type, null: null, default: default }
+      end
+    end
+
+    def timestamps
+      datetime :created_at, null: false
+      datetime :updated_at, null: false
+    end
+
+    def index(column_name)
+      @indexes << column_name
+    end
+  end
+
+  def create_table(table_name)
+    builder = TableBuilder.new(table_name)
+    yield(builder)
+
+    Marlon::DB.create_table(
+      builder.name,
+      builder.columns,
+      builder.indexes
+    )
+  end
+
+  def change_table(table_name)
+    builder = TableBuilder.new(table_name)
+    yield(builder)
+    Marlon::DB.change_table(builder.name, builder.columns, builder.indexes)
+  end
+
+  def drop_table(table_name)
+    Marlon::DB.drop_table(table_name)
   end
 end
