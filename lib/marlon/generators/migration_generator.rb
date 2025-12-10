@@ -21,11 +21,10 @@ module Marlon
         columns = {}
         # Attempt to load model to get attributes
         begin
-          require_relative "../../lib/marlon/models/#{table_name}"
+          require File.join(Dir.pwd, "lib", "marlon", "models", table_name)
           model_class = Object.const_get(classify(table_name))
           if model_class.respond_to?(:attributes)
             columns = model_class.attributes.transform_keys(&:to_s).transform_values { |v| v[:type] }
-            # remove default id/timestamps entries (they'll be added in template)
             columns.delete("id")
             columns.delete("created_at")
             columns.delete("updated_at")
