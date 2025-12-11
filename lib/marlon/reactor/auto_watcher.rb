@@ -19,7 +19,7 @@ module Marlon::Reactor
 
     def self.start
       puts "[Reactor] 🔥 Auto-watcher active"
-
+      Marlon::Reactor::Status.set_watcher_alive(true)
       @watched_dirs = load_watch_dirs
       @file_hashes = snapshot_files
 
@@ -67,26 +67,30 @@ module Marlon::Reactor
       end
     end
 
-    def self.handle_change(file)
-      if CORE_FILES.include?(file)
-        puts "[Reactor] ♻️ Core file changed (#{file}). Restarting…"
-        exec("marlon watch")
-      end
+def self.handle_change(file)
+  if CORE_FILES.include?(file)
+    puts "[Reactor] ♻️ Core file changed (#{file}). Restarting…"
+    exec("marlon watch")
+  end
 
-      puts "[Reactor] ✏️ Reloading: #{file}"
+  puts "[Reactor] ✏️ Reloading: #{file}"
 
-      diff = compute_diff(file)
-      puts diff unless diff.empty?
+  diff = compute_diff(file)
+  puts diff unless diff.empty?
 
-      begin
-        load file
-        Marlon::Reactor.regen_docs if Marlon.const_defined?(:Reactor)
-        puts "[Reactor] ✅ Reloaded"
-      rescue => e
-        puts "[Reactor] 💥 Reload failed in #{file}"
-        puts "Error: #{e.class} - #{e.message}"
-      end
-    end
+  begin
+    load file
+    Marlon::Reactor::Status.mark_reload(file)
+    Marlon::Reactor::Status.update_services!
+    Marlon::Reactor::Status.update_cpu_mem!
+    puts "[Reactor] ✅ Reloaded: #{File.basename(file)}"
+  rescue => e
+    Marlon::Reactor::Status.mark_error(e)
+    puts "[Reactor] 💥 Reload failed in #{file}"
+    puts "Error: #{e.class} - #{e.message}"
+  end
+end
+
 
     def self.compute_diff(file)
       old_content = (@previous_content ||= {})[file] || ""
