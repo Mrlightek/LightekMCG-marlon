@@ -7,7 +7,7 @@ require_relative "systemd_manager"
 require_relative "db_adapter"
 require_relative "migrator"
 require_relative "migration_runner" rescue nil
-require_relative "cli/commands/extend_command"
+#require_relative "cli/commands/extend_command"
 
 # Autoload all CLI commands in lib/marlon/cli/commands
 Dir[File.join(__dir__, "cli", "commands", "*.rb")].sort.each { |f| require f }
