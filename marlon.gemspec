@@ -23,6 +23,7 @@ Gem::Specification.new do |spec|
   # include a db adapter at host level as needed (pg/sqlite3/mysql2)
   spec.add_dependency "sqlite3"
   spec.add_dependency "pg"
+  spec.add_dependency "listen"
 
   spec.add_development_dependency "rake"
   spec.add_development_dependency "rspec"
