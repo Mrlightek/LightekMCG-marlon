@@ -8,6 +8,10 @@ require_relative "db_adapter"
 require_relative "migrator"
 require_relative "migration_runner" rescue nil
 
+# Suppress warnings
+Warning[:deprecated] = false if defined?(Warning)
+
+
 # === Core CLI class ===
 module Marlon
   class CLI < Thor
