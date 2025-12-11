@@ -17,9 +17,7 @@ module Marlon::CLI::Commands
 
             # Command file boilerplate
             File.write(command_file, <<~RUBY)
-              module Marlon
-                module CLI
-                  module Commands
+              module Marlon::CLI::Commands
                     class #{command_class_name}
                       def self.register(cli)
                         cli.desc "g #{name.downcase} ARGS", "Command #{name}"
@@ -29,8 +27,6 @@ module Marlon::CLI::Commands
                       end
                     end
                   end
-                end
-              end
             RUBY
 
             # Generator file boilerplate
