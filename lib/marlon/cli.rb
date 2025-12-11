@@ -7,7 +7,12 @@ require_relative "systemd_manager"
 require_relative "db_adapter"
 require_relative "migrator"
 require_relative "migration_runner" rescue nil
+require_relative "cli/commands/extend_command"
 
+# Autoload all CLI commands in lib/marlon/cli/commands
+Dir[File.join(__dir__, "cli", "commands", "*.rb")].sort.each { |f| require f }
+
+# === Core CLI commands ===
 module Marlon
   class CLI < Thor
     package_name "marlon"
@@ -35,6 +40,7 @@ module Marlon
       Generators.exec(generator, name, *args)
     end
 
+    # === DB commands ===
     desc "generate:model NAME [fields...]", "Generate a model. fields: title:string user:references"
     def generate_model(name, *fields)
       Generators::ModelGenerator.new(name, fields).generate
@@ -57,6 +63,7 @@ module Marlon
       Migrator.new.run
     end
 
+    # === Console & version ===
     desc "console", "Start interactive Marlon console (loads models and DB)"
     def console
       DBAdapter.establish_connection if File.exist?(File.join(Dir.pwd, "config", "database.yml"))
@@ -70,5 +77,25 @@ module Marlon
     def version
       puts Marlon::VERSION
     end
-  end
+
+    # === Modular command loader ===
+    # Dynamically wire all commands in CLI::Commands namespace
+    CLI::Commands.constants.each do |command_class|
+      klass = CLI::Commands.const_get(command_class)
+      # Expect each command class has a `self.register(cli)` method
+      klass.register(self) if klass.respond_to?(:register)
+    end
+
+
+  desc "g:command NAME", "Create a new CLI command + generator + service"
+def g_command(name)
+  Marlon::Generators::CommandGenerator.new(name).generate
+end
+
+desc "g:module NAME", "Generate a full Marlon module"
+def g_module(name)
+  Marlon::Generators::ModuleGenerator.new(name).generate
+end
+
+end
 end
