@@ -1,48 +1,48 @@
 # lib/marlon/reactor/auto_watcher.rb
 require "listen"
+require_relative "../docs/parser"
+require_relative "../docs/markdown_generator"
+require_relative "../docs/playground_generator"
 
 module Marlon
-  class AutoWatcher
-    WATCH_DIRS = [
-      File.join(Dir.pwd, "lib", "marlon"),
-      File.join(Dir.pwd, "services"),
-      File.join(Dir.pwd, "commands")
-    ].freeze
+  module Reactor
+    class AutoWatcher
+      WATCH_PATHS = ["./services", "./commands", "./lib/marlon"]
 
-    def self.start
-      listener = Listen.to(*WATCH_DIRS, only: /\.rb$/) do |modified, added, removed|
-        (modified + added).each { |file| reload_file(file) }
+      # Start watching directories
+      def self.start
+        puts "[Reactor] 👀 Starting auto-watcher..."
+        listener = Listen.to(*WATCH_PATHS) do |modified, added, removed|
+          handle_changes(modified, "modified") unless modified.empty?
+          handle_changes(added, "added")       unless added.empty?
+          handle_changes(removed, "removed")   unless removed.empty?
+        end
+        listener.start
+        sleep
       end
 
-      puts "[Reactor] 🔥 Hot-Reload Active — watching #{WATCH_DIRS.join(", ")}"
-      listener.start
-    end
-
-    def self.reload_file(path)
-      relative = path.sub(Dir.pwd + "/", "")
-
-      puts "[Reactor] ♻️  Reloading #{relative} at #{Time.now}"
-
-      # unload old constants
-      unload_constants_for(path)
-
-      # reload the file
-      load path
-    rescue => e
-      puts "[Reactor] ❌ Failed to reload #{relative}: #{e}"
-    end
-
-    def self.unload_constants_for(path)
-      source = File.read(path)
-      constants = source.scan(/class\s+([A-Z]\w*)|module\s+([A-Z]\w*)/)
-                       .flatten.compact
-
-      constants.each do |const|
-        parent = Object
-        if parent.const_defined?(const)
-          parent.send(:remove_const, const)
-          puts "[Reactor]   → Unloaded #{const}"
+      # Handle file changes
+      def self.handle_changes(files, change_type)
+        files.each do |file|
+          begin
+            load file
+            puts "[Reactor] ♻️ Reloaded #{file} (#{change_type})"
+          rescue => e
+            puts "[Reactor] ⚠️ Error reloading #{file}: #{e.message}"
+          end
         end
+
+        regen_docs
+      end
+
+      # Regenerate all docs and API Playground
+      def self.regen_docs
+        docs = Marlon::Docs::Parser.parse(WATCH_PATHS)
+        Marlon::Docs::MarkdownGenerator.generate(docs)
+        Marlon::Docs::PlaygroundGenerator.generate(docs)
+        puts "[Reactor] 📘 Docs regenerated"
+      rescue => e
+        puts "[Reactor] ⚠️ Error regenerating docs: #{e.message}"
       end
     end
   end
