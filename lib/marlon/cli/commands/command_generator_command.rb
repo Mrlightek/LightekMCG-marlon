@@ -1,7 +1,5 @@
 # lib/marlon/cli/commands/command_generator_command.rb
-module Marlon
-  module CLI
-    module Commands
+module Marlon::CLI::Commands
       class CommandGeneratorCommand
         def self.register(cli)
           cli.desc "g command NAME", "Generate a new command + generator pair"
@@ -60,5 +58,3 @@ module Marlon
         end
       end
     end
-  end
-end

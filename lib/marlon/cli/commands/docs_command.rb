@@ -1,7 +1,5 @@
 # lib/marlon/cli/commands/docs_command.rb
-module Marlon
-  module CLI
-    module Commands
+module Marlon::CLI::Commands
       class DocsCommand
         def self.register(cli)
           cli.desc "docs build", "Generate docs (Markdown, JSON, HTML site + Postman collection)"
@@ -15,5 +13,3 @@ module Marlon
         end
       end
     end
-  end
-end

@@ -1,7 +1,5 @@
 # lib/marlon/cli/commands/extend_command.rb
-module Marlon
-  module CLI
-    module Commands
+module Marlon::CLI::Commands
       class ExtendCommand
         def self.register(cli)
           cli.desc "extend MODULE_NAME", "Scaffold a Marlon module"
@@ -16,5 +14,3 @@ module Marlon
         end
       end
     end
-  end
-end
