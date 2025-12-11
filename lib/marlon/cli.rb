@@ -92,6 +92,14 @@ module Marlon
     def g_module(name)
       Marlon::Generators::ModuleGenerator.new(name).generate
     end
+
+    desc "watch", "Start server with hot-reload + auto-docs + playground"
+option :bind, aliases: "-b", default: "0.0.0.0"
+option :port, aliases: "-p", default: "3000"
+def watch
+  CLI::WatchCommand.run(port: options[:port], bind: options[:bind])
+end
+
   end
 end
 
