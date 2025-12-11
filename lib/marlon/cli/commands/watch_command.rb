@@ -1,7 +1,6 @@
 #lib/marlon/cli/commands/watch_command.rb
 
-module Marlon
-  module CLI
+module Marlon::CLI::Commands
     class WatchCommand
       def self.run(port: 3000, bind: "0.0.0.0")
         puts "[Reactor] 🔥 Starting server + auto-watcher..."
@@ -19,4 +18,4 @@ module Marlon
       end
     end
   end
-end
+
