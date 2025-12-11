@@ -83,7 +83,7 @@ option :hot, type: :boolean, default: true
     # === Modular command loader ===
     # Dynamically wire all commands in CLI::Commands namespace
     CLI::Commands.constants.each do |command_class|
-      klass = CLI::Commands.const_get(command_class)
+      klass = Marlon::CLI::Commands.const_get(command_class)
       # Expect each command class has a `self.register(cli)` method
       klass.register(self) if klass.respond_to?(:register)
     end
