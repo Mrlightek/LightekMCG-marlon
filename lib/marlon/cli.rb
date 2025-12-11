@@ -23,10 +23,11 @@ module Marlon
     end
 
     desc "server [PORT]", "Start Falcon HTTP server"
-    option :bind, aliases: "-b", default: "0.0.0.0"
+    option :bind, aliases: "-b", default: "0.0.0.0", :hot, type: :boolean, default: true
     def server(port = 3000)
       DBAdapter.establish_connection if File.exist?(File.join(Dir.pwd, "config", "database.yml"))
       Reactor.start do
+        Marlon::AutoWatcher.start if options[:hot]
         Server.start(bind: options[:bind], port: port.to_i)
       end
     end
