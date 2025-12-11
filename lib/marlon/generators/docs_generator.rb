@@ -479,46 +479,87 @@ module Marlon
           <a href="/docs/playground/marlon_postman_collection.json" download>Download Postman Collection</a>
 
           <script>
-            async function run(service, action, body, token, resultEl) {
-              try {
-                const res = await fetch('/marlon/gatekeeper', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'X-Marlon-Token': token
-                  },
-                  body: JSON.stringify({ service: service, action: action, payload: JSON.parse(body) })
-                });
-                const text = await res.text();
-                document.getElementById(resultEl).textContent = text;
-              } catch (err) {
-                document.getElementById(resultEl).textContent = 'ERROR: ' + err.message;
-              }
-            }
+  // HOT-RELOAD (polling) for Marlon docs
 
-            document.addEventListener('click', function(e){
-              if(e.target && e.target.classList.contains('run-btn')){
-                const service = e.target.dataset.service;
-                const action = e.target.dataset.action;
-                const textArea = e.target.previousElementSibling;
-                const body = textArea.value;
-                const token = document.getElementById('token').value;
-                const resultEl = 'result_' + service.replace(/[^a-z0-9]/gi,'_') + '_' + action;
-                run(service, action, body, token, resultEl);
-              }
-            });
+//             What this does:
 
-            // assign ids for results
-            document.querySelectorAll('.service h3').forEach(function(h){
-              const id = h.id;
-              const resEl = document.getElementById('result_' + id);
-              if(!resEl){
-                const pre = document.createElement('pre');
-                pre.id = 'result_' + id;
-                h.parentNode.appendChild(pre);
-              }
-            });
-          </script>
+// On page load it fetches /marlon/docs/last_modified to set an initial timestamp.
+// Every 1.5s it polls that endpoint again.
+// If the returned timestamp is newer than the cached one, it reloads the page, giving you instant hot-reload behavior.
+// The existing interactive tester remains functional.
+
+  (function(){
+    const POLL_INTERVAL_MS = 1500; // 1.5s - adjust for faster/slower reloads
+    let lastKnown = 0;
+    const tokenInput = document.getElementById('token');
+
+    async function fetchLastModified() {
+      try {
+        const res = await fetch('/marlon/docs/last_modified', { cache: 'no-store' });
+        if (!res.ok) return null;
+        const json = await res.json();
+        return json.last_modified || 0;
+      } catch (err) {
+        console.warn('Docs poll error', err);
+        return null;
+      }
+    }
+
+    async function pollLoop() {
+      const remote = await fetchLastModified();
+      if (remote && remote > lastKnown) {
+        console.log('[Marlon Docs] change detected — reloading (remote:', remote, 'local:', lastKnown, ')');
+        lastKnown = remote;
+        window.location.reload();
+        return;
+      }
+      // next poll
+      setTimeout(pollLoop, POLL_INTERVAL_MS);
+    }
+
+    // bootstrap initial lastKnown from server on page load
+    (async function init() {
+      const initial = await fetchLastModified();
+      lastKnown = initial || 0;
+      // start polling
+      setTimeout(pollLoop, POLL_INTERVAL_MS);
+    })();
+
+    // existing run() function for the interactive tester remains
+    async function run(service, action, body, token, resultEl) {
+      try {
+        const res = await fetch('/marlon/gatekeeper', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Marlon-Token': token
+          },
+          body: JSON.stringify({ service: service, action: action, payload: JSON.parse(body) })
+        });
+        const text = await res.text();
+        document.getElementById(resultEl).textContent = text;
+      } catch (err) {
+        document.getElementById(resultEl).textContent = 'ERROR: ' + err.message;
+      }
+    }
+
+    document.addEventListener('click', function(e){
+      if(e.target && e.target.classList.contains('run-btn')){
+        const service = e.target.dataset.service;
+        const action = e.target.dataset.action;
+        // textarea is two nodes before button in template; safer to select by attribute
+        const ta = document.querySelector('textarea[data-service="'+service+'"][data-action="'+action+'"]');
+        const body = ta ? ta.value : '{}';
+        const token = document.getElementById('token').value;
+        const anchor = service.replace(/[^a-z0-9]/gi,'_') + '_' + action;
+        const resultEl = 'result_' + anchor;
+        run(service, action, body, token, resultEl);
+      }
+    });
+
+  })();
+</script>
+
         </body>
         </html>
         HTML

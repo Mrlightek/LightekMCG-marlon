@@ -18,6 +18,28 @@ module Marlon
       gatekeeper = Gatekeeper.new(Marlon.config["gatekeeper"] || {})
 
       builder = Falcon::Server.build do |server|
+        # Enables server endpoint that reports the latest modification time in public/docs/
+
+        #Notes:
+         
+         #This returns JSON like { "last_modified": 1700000000 } where the value is a UNIX second timestamp.
+        #No background process required — it computes max mtime on demand.
+
+      server.map "/marlon/docs/last_modified" do
+       run lambda { |env|
+       docs_dir = File.join(Dir.pwd, "public", "docs")
+       unless Dir.exist?(docs_dir)
+      return [404, { "Content-Type" => "application/json" }, [{ error: "no_docs" }.to_json]]
+    end
+
+    files = Dir[File.join(docs_dir, "**", "*")].select { |f| File.file?(f) }
+    last_mtime = files.map { |f| File.mtime(f).to_i }.max || 0
+
+    body = { last_modified: last_mtime, generated_at: Time.now.to_i }
+    [200, { "Content-Type" => "application/json" }, [body.to_json]]
+  }
+end
+
         # mount /marlon/gatekeeper to gatekeeper Rack app
         server.map "/marlon/gatekeeper" do
           run gatekeeper
