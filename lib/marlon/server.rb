@@ -40,7 +40,14 @@ module Marlon
   }
 end
 
-        # mount /marlon/gatekeeper to gatekeeper Rack app
+        server.map "/marlon/hotreload/status" do
+  run lambda { |env|
+    status = Marlon::Reactor::Status.snapshot
+    [200, { "Content-Type" => "application/json" }, [ status.to_json ]]
+  }
+end
+
+# mount /marlon/gatekeeper to gatekeeper Rack app
         server.map "/marlon/gatekeeper" do
           run gatekeeper
         end

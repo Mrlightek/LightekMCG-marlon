@@ -20,6 +20,14 @@ module Marlon::Reactor
     def self.start
       puts "[Reactor] 🔥 Auto-watcher active"
       Marlon::Reactor::Status.set_watcher_alive(true)
+
+      Thread.new do
+  loop do
+    Marlon::Reactor::Status.update_cpu_mem!
+    sleep 2
+  end
+end
+
       @watched_dirs = load_watch_dirs
       @file_hashes = snapshot_files
 

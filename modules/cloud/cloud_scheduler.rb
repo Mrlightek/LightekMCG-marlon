@@ -11,6 +11,10 @@ module Marlon
           def enqueue(job_name, params)
             @queue << { job: job_name, params: params }
             Thread.new { process } # simple multi-threaded execution
+
+            Marlon::Reactor::Status.update_metrics(reactions: { enqueued: Marlon::Reactor::Status.snapshot[:reactions][:enqueued] + 1 })
+           # after processing:
+           Marlon::Reactor::Status.update_metrics(reactions: { processed: Marlon::Reactor::Status.snapshot[:reactions][:processed] + 1 })
           end
 
           def process
