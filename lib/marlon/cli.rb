@@ -1,15 +1,21 @@
 # lib/marlon/cli.rb
 require "thor"
+
 require_relative "installer"
 require_relative "server"
-require_relative "generators"
 require_relative "systemd_manager"
+
+# Core DB + migration components
 require_relative "db_adapter"
 require_relative "migrator"
-require_relative "migration_runner" rescue nil
+require_relative "migration_runner"
+
+# Generators folder (explicit loads)
+Dir[File.join(__dir__, "generators", "*.rb")].sort.each { |f| require f }
 
 # Suppress warnings
 Warning[:deprecated] = false if defined?(Warning)
+
 
 
 # === Core CLI class ===

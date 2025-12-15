@@ -10,6 +10,7 @@ Gem::Specification.new do |spec|
   spec.description   = "Standalone Ruby framework — HTTP/WS with Falcon, Async reactor, ActiveRecord support, systemd integration, UI Schema DSL."
   spec.files         = Dir["lib/**/*", "exe/*", "templates/**/*", "Rakefile", "install_marlon.sh", "README.md", "LICENSE"]
   spec.require_paths = ["lib"]
+  spec.executables = ["marlon"]
 
   # runtime
   spec.add_dependency "thor"
