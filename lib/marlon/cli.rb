@@ -1,17 +1,29 @@
 # lib/marlon/cli.rb
 require "thor"
+
 require_relative "installer"
 require_relative "server"
-require_relative "generators"
 require_relative "systemd_manager"
+
+# Core DB + migration components
 require_relative "db_adapter"
 require_relative "migrator"
-require_relative "migration_runner" rescue nil
+require_relative "migration_runner"
 
+# Generators folder (explicit loads)
+Dir[File.join(__dir__, "generators", "*.rb")].sort.each { |f| require f }
+
+# Suppress warnings
+Warning[:deprecated] = false if defined?(Warning)
+
+
+
+# === Core CLI class ===
 module Marlon
   class CLI < Thor
     package_name "marlon"
 
+    # --- Basic commands ---
     desc "install", "Install marlon into current project"
     def install
       Installer.new.run
@@ -19,9 +31,12 @@ module Marlon
 
     desc "server [PORT]", "Start Falcon HTTP server"
     option :bind, aliases: "-b", default: "0.0.0.0"
+    option :hot, type: :boolean, default: true
     def server(port = 3000)
       DBAdapter.establish_connection if File.exist?(File.join(Dir.pwd, "config", "database.yml"))
+
       Reactor.start do
+        Marlon::AutoWatcher.start if options[:hot]
         Server.start(bind: options[:bind], port: port.to_i)
       end
     end
@@ -35,6 +50,7 @@ module Marlon
       Generators.exec(generator, name, *args)
     end
 
+    # --- DB commands ---
     desc "generate:model NAME [fields...]", "Generate a model. fields: title:string user:references"
     def generate_model(name, *fields)
       Generators::ModelGenerator.new(name, fields).generate
@@ -57,6 +73,7 @@ module Marlon
       Migrator.new.run
     end
 
+    # --- Console & version ---
     desc "console", "Start interactive Marlon console (loads models and DB)"
     def console
       DBAdapter.establish_connection if File.exist?(File.join(Dir.pwd, "config", "database.yml"))
@@ -70,5 +87,33 @@ module Marlon
     def version
       puts Marlon::VERSION
     end
+
+    # --- CLI generators ---
+    desc "g:command NAME", "Create a new CLI command + generator + service"
+    def g_command(name)
+      Marlon::Generators::CommandGenerator.new(name).generate
+    end
+
+    desc "g:module NAME", "Generate a full Marlon module"
+    def g_module(name)
+      Marlon::Generators::ModuleGenerator.new(name).generate
+    end
+
+    desc "watch", "Start server with hot-reload + auto-docs + playground"
+option :bind, aliases: "-b", default: "0.0.0.0"
+option :port, aliases: "-p", default: "3000"
+def watch
+  CLI::WatchCommand.run(port: options[:port], bind: options[:bind])
+end
+
   end
+end
+
+# === Load all CLI commands AFTER CLI class exists ===
+Dir[File.join(__dir__, "cli", "commands", "*.rb")].sort.each { |f| require f }
+
+# Wire all commands dynamically
+Marlon::CLI::Commands.constants.each do |command_class|
+  klass = Marlon::CLI::Commands.const_get(command_class)
+  klass.register(Marlon::CLI) if klass.respond_to?(:register)
 end

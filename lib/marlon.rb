@@ -4,10 +4,6 @@
 require "zeitwerk"
 require "yaml"
 require "fileutils"
-require "active_support"
-require "active_support/core_ext/hash/indifferent_access"
-require "active_support/security_utils"
-
 require_relative "marlon/version"
 
 module Marlon

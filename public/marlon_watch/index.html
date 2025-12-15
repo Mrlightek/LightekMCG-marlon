@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Marlon Watch UI</title>
+  <style>
+    body{font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial;padding:20px}
+    .card{border:1px solid #eee;padding:12px;border-radius:8px;margin-bottom:12px}
+    pre{background:#fafafa;padding:8px;border-radius:6px;overflow:auto}
+    .green{color:green} .red{color:red}
+  </style>
+</head>
+<body>
+  <h1>Marlon Live Watch</h1>
+  <div id="status">Loading…</div>
+  <div id="files" class="card"></div>
+  <div id="services" class="card"></div>
+  <div id="metrics" class="card"></div>
+  <script>
+    async function fetchStatus(){
+      const res = await fetch('/marlon/hotreload/status', {cache:'no-store'});
+      if(!res.ok) { document.getElementById('status').innerText = 'Status unavailable'; return; }
+      const json = await res.json();
+      document.getElementById('status').innerHTML = `
+        Watcher: <strong>${json.watcher_alive ? 'online' : 'offline'}</strong> |
+        Reloads: ${json.reload_count} |
+        Errors: ${json.reload_errors}
+      `;
+      document.getElementById('files').innerHTML = '<h3>Recent Reloads</h3>' + (json.files_reloaded.slice(-10).map(f => `<div>${f.at} — ${f.file}</div>`).join('') || '<div>—</div>');
+      document.getElementById('services').innerHTML = '<h3>Services ('+Object.keys(json.services).length+')</h3><pre>'+Object.keys(json.services).slice(0,200).join("\n")+'</pre>';
+      document.getElementById('metrics').innerHTML = `<h3>Metrics</h3>
+        <div>CPU utime: ${json.cpu.utime.toFixed(2)}s stime: ${json.cpu.stime.toFixed(2)}s</div>
+        <div>RSS: ${json.memory.rss_kb || 'n/a'} KB</div>
+      `;
+    }
+
+    setInterval(fetchStatus, 1000);
+    fetchStatus();
+  </script>
+</body>
+</html>

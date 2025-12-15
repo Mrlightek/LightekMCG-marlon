@@ -7,8 +7,8 @@ module Marlon
       def initialize(name)
         raise "Name required" unless name
         @name = name
-        @class_name = name.split(/_|-/).map(&:capitalize).join
-        @file_name = name.gsub(/([A-Z])/, '_\1').sub(/^_/, '').downcase
+        @class_name = Marlon::Inflector.camelize(name)
+        @file_name = Marlon::Inflector.underscore(name)
       end
 
       def generate
@@ -21,7 +21,7 @@ module Marlon
         write_file(File.join(Dir.pwd, "app", "marlon", "payloads", "#{@file_name}_payload.rb"), payload)
 
         # migration
-        MigrationGenerator.new("create_#{@file_name.pluralize}").generate
+        MigrationGenerator.new("create_#{Marlon::Inflector.pluralize(@file_name)}").generate
 
         # router entry
         entry = "Marlon::Router.map(\"#{@file_name}\", Marlon::Services::#{@class_name}Service)\n"

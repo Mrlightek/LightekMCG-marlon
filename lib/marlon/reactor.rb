@@ -47,10 +47,8 @@ module Marlon
     end
 
     def self.start(&block)
-      @root_task = Async do |task|
-        instance_exec(&block)
-      end
-      @root_task
+      Thread.new { Marlon::AutoWatcher.start }
+      block.call
     end
 
     def self.create_supervisor(name:, restart: :permanent)

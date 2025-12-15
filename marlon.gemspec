@@ -10,6 +10,7 @@ Gem::Specification.new do |spec|
   spec.description   = "Standalone Ruby framework — HTTP/WS with Falcon, Async reactor, ActiveRecord support, systemd integration, UI Schema DSL."
   spec.files         = Dir["lib/**/*", "exe/*", "templates/**/*", "Rakefile", "install_marlon.sh", "README.md", "LICENSE"]
   spec.require_paths = ["lib"]
+  spec.executables = ["marlon"]
 
   # runtime
   spec.add_dependency "thor"
@@ -23,6 +24,7 @@ Gem::Specification.new do |spec|
   # include a db adapter at host level as needed (pg/sqlite3/mysql2)
   spec.add_dependency "sqlite3"
   spec.add_dependency "pg"
+  spec.add_dependency "listen"
 
   spec.add_development_dependency "rake"
   spec.add_development_dependency "rspec"

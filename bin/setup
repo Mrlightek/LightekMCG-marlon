@@ -1,8 +1,41 @@
-#!/usr/bin/env bash
-set -euo pipefail
-IFS=$'\n\t'
-set -vx
+# #!/usr/bin/env bash
+# set -euo pipefail
+# IFS=$'\n\t'
+# set -vx
 
-bundle install
+# bundle install
 
-# Do any other automated setup that you need to do here
+# # Do any other automated setup that you need to do here
+
+# #!/usr/bin/env ruby
+# ENV['RUBYOPT'] ||= '-W0'
+# load File.expand_path('../marlon/cli.rb', __dir__)
+
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Suppress Ruby warnings globally
+ENV['RUBYOPT'] ||= '-W0'
+
+require 'fileutils'
+
+# Ensure Bundler is set up and gems are installed
+begin
+  require 'bundler/setup'
+rescue LoadError
+  puts "Bundler not found. Installing..."
+  system("gem install bundler") || abort("Failed to install Bundler")
+  require 'bundler/setup'
+end
+
+# Check if all gems are installed
+begin
+  Bundler.setup
+rescue Bundler::GemNotFound
+  puts "Installing missing gems..."
+  system("bundle install") || abort("Failed to install gems")
+  Bundler.setup
+end
+
+# Load the Marlon CLI
+load File.expand_path('../marlon/cli.rb', __dir__)
