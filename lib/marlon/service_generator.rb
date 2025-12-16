@@ -58,7 +58,7 @@ module Marlon
         enable_and_start_service(service)
         write_service_dsl(service)
         setup_metrics_logging(service) if metrics
-        embed_dashboard(service)
+        embed_dashboard unless dashboard_running?
       end
     end
 
@@ -266,35 +266,42 @@ module Marlon
     end
 
     # -----------------------------
-    # Metrics & Logging Setup
+    # Plug-and-play metrics & Logging
     # -----------------------------
     def setup_metrics_logging(service_name)
       FileUtils.mkdir_p(DEFAULT_METRICS_DIR)
+      metrics_file = File.join(DEFAULT_METRICS_DIR, "#{service_name}.json")
 
-      metric_script = File.join(DEFAULT_INSTALL_DIR, "services", "#{service_name}_metrics.rb")
-      File.write(metric_script, <<~RUBY)
-        require 'json'
-        metrics_file = "#{DEFAULT_METRICS_DIR}/#{service_name}.json"
+      # Write initial empty metrics
+      File.write(metrics_file, JSON.pretty_generate({ timestamp: Time.now.to_i }))
 
+      # Register service in global metrics registry
+      registry_path = File.join(DEFAULT_INSTALL_DIR, "metrics_registry.yml")
+      registry = File.exist?(registry_path) ? YAML.load_file(registry_path) || {} : {}
+      registry[service_name] = { file: metrics_file, updated_at: Time.now.to_i }
+      File.write(registry_path, registry.to_yaml)
+
+      # Background thread updates metrics every 5s
+      Thread.new do
         loop do
           stats = {
             timestamp: Time.now.to_i,
-            cpu_percent: `ps -p \#{Process.pid} -o %cpu=`.to_f,
-            memory_kb: `ps -p \#{Process.pid} -o rss=`.to_i,
+            cpu_percent: `ps -p #{Process.pid} -o %cpu=`.to_f,
+            memory_kb: `ps -p #{Process.pid} -o rss=`.to_i,
             uptime_sec: `cat /proc/uptime`.split[0].to_f
           }
           File.write(metrics_file, JSON.pretty_generate(stats))
           sleep 5
         end
-      RUBY
+      end
 
-      puts "📊 Metrics script written: #{metric_script}"
+      puts "📊 Metrics auto-registered for service '#{service_name}'"
     end
 
     # -----------------------------
-    # Embed Falcon dashboard for web observability
+    # Embed Falcon dashboard
     # -----------------------------
-    def embed_dashboard(service_name)
+    def embed_dashboard
       dashboard_dir = File.join(DEFAULT_INSTALL_DIR, "dashboard")
       FileUtils.mkdir_p(dashboard_dir)
       dashboard_file = File.join(dashboard_dir, "server.rb")
@@ -304,28 +311,28 @@ module Marlon
       File.write(dashboard_file, <<~RUBY)
         require 'falcon'
         require 'json'
-        require 'webrick'
-
-        DASHBOARD_PORT = #{DASHBOARD_PORT}
         METRICS_DIR = "#{DEFAULT_METRICS_DIR}"
+        DASHBOARD_PORT = #{DASHBOARD_PORT}
 
         class DashboardApp < Falcon::Component
           def handle(socket)
-            request = socket.read
+            socket.write("HTTP/1.1 200 OK\\r\\nContent-Type: application/json\\r\\n\\r\\n")
             metrics_files = Dir.glob("\#{METRICS_DIR}/*.json")
             metrics_data = metrics_files.map { |f| JSON.parse(File.read(f)) }
-            socket.write("HTTP/1.1 200 OK\\r\\nContent-Type: application/json\\r\\n\\r\\n")
             socket.write(JSON.pretty_generate(metrics_data))
           end
         end
 
-        # Start Falcon server for Marlon dashboard
         puts "🌐 Marlon dashboard listening on port \#{DASHBOARD_PORT}..."
         server = Falcon::Server.new(DashboardApp.new, bind: "tcp://0.0.0.0:\#{DASHBOARD_PORT}")
         server.run
       RUBY
 
       puts "🌐 Embedded Falcon dashboard scaffold created at: #{dashboard_file}"
+    end
+
+    def dashboard_running?
+      File.exist?(File.join(DEFAULT_INSTALL_DIR, "dashboard", "server.rb"))
     end
   end
 
