@@ -2,6 +2,7 @@
 require 'fileutils'
 require 'yaml'
 require 'json'
+require 'falcon'
 
 module Marlon
   class ServiceGenerator
@@ -10,6 +11,7 @@ module Marlon
     DEFAULT_INSTALL_DIR   = "/opt/marlon"
     DEFAULT_LOG_DIR       = "/var/log/marlon"
     DEFAULT_METRICS_DIR   = "/var/lib/marlon/metrics"
+    DASHBOARD_PORT        = 4567
 
     attr_reader :name, :exec, :cpu, :memory, :depends_on, :optional
     attr_reader :network_limit, :disk_limit, :env_vars, :ports, :sockets, :flags
@@ -56,6 +58,7 @@ module Marlon
         enable_and_start_service(service)
         write_service_dsl(service)
         setup_metrics_logging(service) if metrics
+        embed_dashboard(service)
       end
     end
 
@@ -286,6 +289,43 @@ module Marlon
       RUBY
 
       puts "📊 Metrics script written: #{metric_script}"
+    end
+
+    # -----------------------------
+    # Embed Falcon dashboard for web observability
+    # -----------------------------
+    def embed_dashboard(service_name)
+      dashboard_dir = File.join(DEFAULT_INSTALL_DIR, "dashboard")
+      FileUtils.mkdir_p(dashboard_dir)
+      dashboard_file = File.join(dashboard_dir, "server.rb")
+
+      return if File.exist?(dashboard_file)
+
+      File.write(dashboard_file, <<~RUBY)
+        require 'falcon'
+        require 'json'
+        require 'webrick'
+
+        DASHBOARD_PORT = #{DASHBOARD_PORT}
+        METRICS_DIR = "#{DEFAULT_METRICS_DIR}"
+
+        class DashboardApp < Falcon::Component
+          def handle(socket)
+            request = socket.read
+            metrics_files = Dir.glob("\#{METRICS_DIR}/*.json")
+            metrics_data = metrics_files.map { |f| JSON.parse(File.read(f)) }
+            socket.write("HTTP/1.1 200 OK\\r\\nContent-Type: application/json\\r\\n\\r\\n")
+            socket.write(JSON.pretty_generate(metrics_data))
+          end
+        end
+
+        # Start Falcon server for Marlon dashboard
+        puts "🌐 Marlon dashboard listening on port \#{DASHBOARD_PORT}..."
+        server = Falcon::Server.new(DashboardApp.new, bind: "tcp://0.0.0.0:\#{DASHBOARD_PORT}")
+        server.run
+      RUBY
+
+      puts "🌐 Embedded Falcon dashboard scaffold created at: #{dashboard_file}"
     end
   end
 

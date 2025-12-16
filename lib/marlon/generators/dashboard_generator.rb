@@ -1,164 +1,120 @@
 # lib/marlon/generators/dashboard_generator.rb
-require 'erb'
-require 'fileutils'
-require 'webrick'
-require 'json'
+require "fileutils"
+require "falcon"
+require "json"
+require "marlon/gatekeeper"
 
 module Marlon
   module Generators
     class DashboardGenerator
-      DASHBOARD_DIR = "/opt/marlon/dashboard"
-      TEMPLATE_FILE = "#{DASHBOARD_DIR}/index.html.erb"
+      DASHBOARD_DIR = File.expand_path("../../../dashboard", __dir__)
 
-      def initialize(services_registry)
-        # Expecting a hash: { service_name => { status: :running/:stopped, description: "..." } }
-        @services_registry = services_registry
+      attr_reader :services
+
+      def initialize(services = [])
+        @services = services
       end
 
-      # Generate all files for the dashboard
-      def generate
-        prepare_directory
-        write_template
-        render_html
-        start_server
-        puts "🎨 Dashboard generated and running at http://localhost:4567"
-      end
-
-      private
-
-      def prepare_directory
+      # Generate dashboard files (HTML/CSS/JS)
+      def generate_dashboard_files
         FileUtils.mkdir_p(DASHBOARD_DIR)
-      end
 
-      def write_template
-        template = <<~HTML
+        # Basic HTML dashboard
+        File.write("#{DASHBOARD_DIR}/index.html", <<~HTML)
           <!DOCTYPE html>
           <html lang="en">
           <head>
             <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Marlon Service Dashboard</title>
+            <title>Marlon Dashboard</title>
             <style>
-              body { font-family: sans-serif; background: #f4f4f4; padding: 20px; }
+              body { font-family: sans-serif; background: #111; color: #eee; }
               h1 { text-align: center; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-              th, td { padding: 10px; border: 1px solid #ccc; text-align: left; }
-              th { background: #333; color: white; }
-              tr.running { background: #d4ffd4; }
-              tr.stopped { background: #ffd4d4; }
-              button { padding: 5px 10px; margin-right: 5px; }
+              .service { padding: 10px; margin: 5px; border: 1px solid #444; border-radius: 5px; }
+              .running { color: #0f0; }
+              .stopped { color: #f00; }
+              button { margin-left: 10px; }
             </style>
           </head>
           <body>
-            <h1>Marlon Service Dashboard</h1>
-            <table>
-              <thead>
-                <tr>
-                  <th>Service</th>
-                  <th>Status</th>
-                  <th>Description</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="services-table">
-              </tbody>
-            </table>
-
+            <h1>Marlon Dashboard</h1>
+            <div id="services"></div>
             <script>
               async function fetchStatus() {
-                const res = await fetch('/status');
-                const data = await res.json();
-                const tbody = document.getElementById('services-table');
-                tbody.innerHTML = '';
-                for (const [name, info] of Object.entries(data)) {
-                  const row = document.createElement('tr');
-                  row.className = info.status;
-                  row.innerHTML = \`
-                    <td>\${name}</td>
-                    <td>\${info.status.charAt(0).toUpperCase() + info.status.slice(1)}</td>
-                    <td>\${info.description}</td>
-                    <td>
-                      <button onclick="control('\${name}', 'start')">Start</button>
-                      <button onclick="control('\${name}', 'stop')">Stop</button>
-                      <button onclick="control('\${name}', 'restart')">Restart</button>
-                    </td>
+                const token = prompt("Enter Marlon token:");
+                const resp = await fetch("/", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "X-Marlon-Token": token },
+                  body: JSON.stringify({ object: "dashboard_status" })
+                });
+                const data = await resp.json();
+                const container = document.getElementById("services");
+                container.innerHTML = "";
+                for (const svc of data.services) {
+                  const div = document.createElement("div");
+                  div.className = "service";
+                  div.innerHTML = \`
+                    <strong>\${svc.name}</strong> -
+                    <span class="\${svc.running ? 'running' : 'stopped'}">\${svc.running ? 'RUNNING' : 'STOPPED'}</span>
+                    <button onclick="control('\${svc.name}', 'start')">Start</button>
+                    <button onclick="control('\${svc.name}', 'stop')">Stop</button>
                   \`;
-                  tbody.appendChild(row);
+                  container.appendChild(div);
                 }
               }
 
-              async function control(service, action) {
-                await fetch(\`/service/\${service}/\${action}\`, { method: 'POST' });
-                fetchStatus();
+              async function control(name, action) {
+                const token = prompt("Enter Marlon token:");
+                await fetch("/", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "X-Marlon-Token": token },
+                  body: JSON.stringify({ object: "dashboard_control", service: name, action })
+                });
+                await fetchStatus();
               }
 
               fetchStatus();
-              setInterval(fetchStatus, 5000);
+              setInterval(fetchStatus, 5000); // refresh every 5s
             </script>
           </body>
           </html>
         HTML
-
-        File.write(TEMPLATE_FILE, template)
       end
 
-      def render_html
-        # Initial render (can be overwritten by server)
-        erb = ERB.new(File.read(TEMPLATE_FILE))
-        html = erb.result(binding)
-        File.write("#{DASHBOARD_DIR}/index.html", html)
-      end
+      # Integrate with Falcon/Gatekeeper
+      def integrate_with_falcon
+        # Monkey-patch Gatekeeper to handle dashboard payloads
+        gatekeeper = Marlon::Gatekeeper.new
+        original_call = gatekeeper.method(:call)
 
-      # Start a simple HTTP server to serve the dashboard and handle actions
-      def start_server
-        server = WEBrick::HTTPServer.new(Port: 4567, DocumentRoot: DASHBOARD_DIR)
-
-        # Serve the dashboard HTML
-        server.mount_proc '/' do |req, res|
-          res.body = File.read("#{DASHBOARD_DIR}/index.html")
-          res['Content-Type'] = 'text/html'
-        end
-
-        # API to get current service statuses
-        server.mount_proc '/status' do |req, res|
-          statuses = @services_registry.transform_values do |info|
-            { status: systemd_status(info[:unit]), description: info[:description] }
+        gatekeeper.define_singleton_method(:call) do |env|
+          req = Rack::Request.new(env)
+          if req.post?
+            body = req.body.read
+            payload = JSON.parse(body) rescue {}
+            case payload["object"]
+            when "dashboard_status"
+              services_status = services.map { |svc| { name: svc.name, running: svc.running? } }
+              return [200, { "Content-Type" => "application/json" }, [ { services: services_status }.to_json ]]
+            when "dashboard_control"
+              svc = services.find { |s| s.name == payload["service"] }
+              svc.send(payload["action"]) if svc
+              return [200, { "Content-Type" => "application/json" }, [ { status: "ok" }.to_json ]]
+            end
           end
-          res.body = statuses.to_json
-          res['Content-Type'] = 'application/json'
+          original_call.call(env)
         end
-
-        # API to control services
-        server.mount_proc '/service' do |req, res|
-          path_parts = req.path.split('/')
-          service = path_parts[2]
-          action = path_parts[3]
-          if @services_registry.key?(service) && %w[start stop restart].include?(action)
-            system("sudo systemctl #{action} #{@services_registry[service][:unit]}")
-          end
-          res.body = { ok: true }.to_json
-          res['Content-Type'] = 'application/json'
-        end
-
-        trap 'INT' do
-          server.shutdown
-        end
-
-        Thread.new { server.start }
       end
 
-      def systemd_status(unit)
-        return :unknown unless unit
-        output = `systemctl is-active #{unit}`.strip
-        output == 'active' ? :running : :stopped
+      # CLI command integration
+      def add_cli_command(cli)
+        cli.register_command("dashboard") do |_args|
+          puts "🚀 Starting Marlon dashboard at http://localhost:4567/dashboard"
+          generate_dashboard_files
+          integrate_with_falcon
+          # Falcon server already running; just ensure assets are served
+          Falcon::Server.new(app: Rack::Directory.new(DASHBOARD_DIR)).run
+        end
       end
     end
   end
 end
-
-# Example usage:
-# services = {
-#   "web_server" => { unit: "nginx.service", description: "Handles HTTP requests" },
-#   "db_service"  => { unit: "postgresql.service", description: "Database backend" }
-# }
-# Marlon::Generators::DashboardGenerator.new(services).generate
