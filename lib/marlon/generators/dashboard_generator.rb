@@ -1,7 +1,8 @@
 # lib/marlon/generators/dashboard_generator.rb
 require 'erb'
-require 'json'
 require 'fileutils'
+require 'webrick'
+require 'json'
 
 module Marlon
   module Generators
@@ -19,7 +20,8 @@ module Marlon
         prepare_directory
         write_template
         render_html
-        puts "🎨 Dashboard generated at #{DASHBOARD_DIR}/index.html"
+        start_server
+        puts "🎨 Dashboard generated and running at http://localhost:4567"
       end
 
       private
@@ -58,25 +60,40 @@ module Marlon
                   <th>Actions</th>
                 </tr>
               </thead>
-              <tbody>
-                <% @services_registry.each do |name, info| %>
-                  <tr class="<%= info[:status] %>">
-                    <td><%= name %></td>
-                    <td><%= info[:status].to_s.capitalize %></td>
-                    <td><%= info[:description] %></td>
-                    <td>
-                      <button onclick="fetch('/service/<%= name %>/start', { method: 'POST' })">Start</button>
-                      <button onclick="fetch('/service/<%= name %>/stop', { method: 'POST' })">Stop</button>
-                      <button onclick="fetch('/service/<%= name %>/restart', { method: 'POST' })">Restart</button>
-                    </td>
-                  </tr>
-                <% end %>
+              <tbody id="services-table">
               </tbody>
             </table>
 
             <script>
-              // Optional: auto-refresh every 5 seconds
-              setInterval(() => { location.reload(); }, 5000);
+              async function fetchStatus() {
+                const res = await fetch('/status');
+                const data = await res.json();
+                const tbody = document.getElementById('services-table');
+                tbody.innerHTML = '';
+                for (const [name, info] of Object.entries(data)) {
+                  const row = document.createElement('tr');
+                  row.className = info.status;
+                  row.innerHTML = \`
+                    <td>\${name}</td>
+                    <td>\${info.status.charAt(0).toUpperCase() + info.status.slice(1)}</td>
+                    <td>\${info.description}</td>
+                    <td>
+                      <button onclick="control('\${name}', 'start')">Start</button>
+                      <button onclick="control('\${name}', 'stop')">Stop</button>
+                      <button onclick="control('\${name}', 'restart')">Restart</button>
+                    </td>
+                  \`;
+                  tbody.appendChild(row);
+                }
+              }
+
+              async function control(service, action) {
+                await fetch(\`/service/\${service}/\${action}\`, { method: 'POST' });
+                fetchStatus();
+              }
+
+              fetchStatus();
+              setInterval(fetchStatus, 5000);
             </script>
           </body>
           </html>
@@ -86,9 +103,54 @@ module Marlon
       end
 
       def render_html
+        # Initial render (can be overwritten by server)
         erb = ERB.new(File.read(TEMPLATE_FILE))
         html = erb.result(binding)
         File.write("#{DASHBOARD_DIR}/index.html", html)
+      end
+
+      # Start a simple HTTP server to serve the dashboard and handle actions
+      def start_server
+        server = WEBrick::HTTPServer.new(Port: 4567, DocumentRoot: DASHBOARD_DIR)
+
+        # Serve the dashboard HTML
+        server.mount_proc '/' do |req, res|
+          res.body = File.read("#{DASHBOARD_DIR}/index.html")
+          res['Content-Type'] = 'text/html'
+        end
+
+        # API to get current service statuses
+        server.mount_proc '/status' do |req, res|
+          statuses = @services_registry.transform_values do |info|
+            { status: systemd_status(info[:unit]), description: info[:description] }
+          end
+          res.body = statuses.to_json
+          res['Content-Type'] = 'application/json'
+        end
+
+        # API to control services
+        server.mount_proc '/service' do |req, res|
+          path_parts = req.path.split('/')
+          service = path_parts[2]
+          action = path_parts[3]
+          if @services_registry.key?(service) && %w[start stop restart].include?(action)
+            system("sudo systemctl #{action} #{@services_registry[service][:unit]}")
+          end
+          res.body = { ok: true }.to_json
+          res['Content-Type'] = 'application/json'
+        end
+
+        trap 'INT' do
+          server.shutdown
+        end
+
+        Thread.new { server.start }
+      end
+
+      def systemd_status(unit)
+        return :unknown unless unit
+        output = `systemctl is-active #{unit}`.strip
+        output == 'active' ? :running : :stopped
       end
     end
   end
@@ -96,7 +158,7 @@ end
 
 # Example usage:
 # services = {
-#   "web_server" => { status: :running, description: "Handles HTTP requests" },
-#   "db_service" => { status: :stopped, description: "Database backend" }
+#   "web_server" => { unit: "nginx.service", description: "Handles HTTP requests" },
+#   "db_service"  => { unit: "postgresql.service", description: "Database backend" }
 # }
 # Marlon::Generators::DashboardGenerator.new(services).generate
