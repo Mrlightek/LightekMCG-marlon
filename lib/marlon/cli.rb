@@ -30,6 +30,11 @@ module Marlon
       Installer.new.run
     end
 
+    desc "version", "Show marlon version"
+    def version
+      puts Marlon::VERSION
+    end
+
     desc "server [PORT]", "Start Falcon HTTP server with integrated dashboard and live metrics"
     option :bind, aliases: "-b", default: "0.0.0.0"
     option :hot, type: :boolean, default: true
