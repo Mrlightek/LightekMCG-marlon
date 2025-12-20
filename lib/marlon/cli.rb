@@ -184,4 +184,9 @@ Dir[File.join(__dir__, "cli", "commands", "*.rb")].sort.each { |f| require f }
 Marlon::CLI::Commands.constants.each do |command_class|
   klass = Marlon::CLI::Commands.const_get(command_class)
   klass.register(Marlon::CLI) if klass.respond_to?(:register)
+
+  def self.exit_on_failure?
+    true
+  end
+
 end
