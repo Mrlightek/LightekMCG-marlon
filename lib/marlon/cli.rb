@@ -12,6 +12,7 @@ require_relative "db_adapter"
 require_relative "migrator"
 require_relative "migration_runner"
 require_relative "service_generator"
+require_relative "generators" # 👈 ADD THIS
 
 # Generators folder (explicit loads)
 Dir[File.join(__dir__, "generators", "*.rb")].sort.each { |f| require f }
@@ -22,44 +23,43 @@ Warning[:deprecated] = false if defined?(Warning)
 module Marlon
   # === Generators subcommand CLI ===
   class GeneratorsCLI < Thor
-    # Exit properly on failure
     def self.exit_on_failure?
       true
     end
 
     desc "service NAME", "Generate a service contract"
     def service(name)
-      Generators.exec("service", name)
+      Generators.run(:service, name)
     end
 
     desc "model NAME [FIELDS...]", "Generate a model"
     def model(name, *fields)
-      Generators.exec("model", name, *fields)
+      Generators.run(:model, name, *fields)
     end
 
     desc "migration NAME", "Generate a migration"
     def migration(name)
-      Generators.exec("migration", name)
+      Generators.run(:migration, name)
     end
 
     desc "scaffold NAME [FIELDS...]", "Generate scaffold (model + migration + controller + views)"
     def scaffold(name, *fields)
-      Generators.exec("scaffold", name, *fields)
+      Generators.run(:scaffold, name, *fields)
     end
 
     desc "systemd NAME", "Generate a systemd service template"
     def systemd(name)
-      Generators.exec("systemd", name)
+      Generators.run(:systemd, name)
     end
 
     desc "proxy NAME", "Generate a proxy service"
     def proxy(name)
-      Generators.exec("proxy", name)
+      Generators.run(:proxy, name)
     end
 
     desc "command NAME", "Generate a CLI command + service generator"
     def command(name)
-      Generators.exec("command", name)
+      Generators.run(:command, name)
     end
   end
 
@@ -67,7 +67,6 @@ module Marlon
   class CLI < Thor
     package_name "marlon"
 
-    # Exit properly on failure
     def self.exit_on_failure?
       true
     end
@@ -87,7 +86,7 @@ module Marlon
     option :bind, aliases: "-b", default: "0.0.0.0"
     option :hot, type: :boolean, default: true
     option :dashboard, type: :boolean, default: true
-    def server(port = 3000)
+    def server(port = "3000") # 👈 STRING DEFAULT
       DBAdapter.establish_connection if File.exist?(File.join(Dir.pwd, "config", "database.yml"))
 
       Reactor.start do
@@ -140,16 +139,6 @@ module Marlon
             HTML
           end
 
-          app.mount("/__marlon_dashboard") do |req|
-            path = req.path.sub("/__marlon_dashboard", "")
-            file = path.empty? || path == "/" ? index_file : File.join(dashboard_dir, path)
-            if File.file?(file)
-              [200, { "Content-Type" => Rack::Mime.mime_type(File.extname(file)) }, [File.read(file)]]
-            else
-              [404, {}, ["Dashboard file not found"]]
-            end
-          end
-
           metrics_dir = Marlon::ServiceGenerator::DEFAULT_METRICS_DIR
           app.mount("/__marlon_dashboard/metrics.json") do |_req|
             all_metrics = {}
@@ -163,7 +152,7 @@ module Marlon
             [200, { "Content-Type" => "application/json" }, [all_metrics.to_json]]
           end
 
-          Launchy.open("http://#{options[:bind]}:#{port}/__marlon_dashboard") rescue nil
+          Launchy.open("http://#{options[:bind]}:#{port}") rescue nil
         end
 
         puts "🚀 Marlon server running on #{options[:bind]}:#{port}"
@@ -174,14 +163,11 @@ module Marlon
     # --- start all ---
     desc "start:all", "Start all Marlon services with dashboard and live metrics"
     option :bind, aliases: "-b", default: "0.0.0.0"
-    option :port, aliases: "-p", default: 3000
+    option :port, aliases: "-p", default: "3000" # 👈 STRING
     option :hot, type: :boolean, default: true
     def start_all
       services_dir = File.join(Marlon::ServiceGenerator::DEFAULT_INSTALL_DIR, "services")
-      unless Dir.exist?(services_dir)
-        puts "No services found in #{services_dir}"
-        return
-      end
+      return puts "No services found in #{services_dir}" unless Dir.exist?(services_dir)
 
       Dir[File.join(services_dir, "*.rb")].each { |f| require f }
 
@@ -191,59 +177,19 @@ module Marlon
              hot: options[:hot]
     end
 
-    # --- stop all ---
-    desc "stop:all", "Gracefully stop all Marlon services and the server"
-    def stop_all
-      puts "🛑 Stopping Marlon services..."
-
-      if defined?(Falcon::Server)
-        Falcon::Server.stop rescue nil
-        puts "✔ Falcon server stopped"
-      end
-
-      Thread.list.each do |t|
-        next if t == Thread.main
-        t.kill rescue nil
-      end
-      puts "✔ Service threads terminated"
-
-      metrics_dir = Marlon::ServiceGenerator::DEFAULT_METRICS_DIR
-      if Dir.exist?(metrics_dir)
-        Dir[File.join(metrics_dir, "*.json")].each do |file|
-          begin
-            data = JSON.parse(File.read(file))
-            data["status"] = "stopped"
-            data["stopped_at"] = Time.now.utc.iso8601
-            File.write(file, JSON.pretty_generate(data))
-          rescue
-          end
-        end
-        puts "✔ Metrics flushed"
-      end
-
-      puts "✅ Marlon fully stopped"
-    end
-
-    # --- watch (optional) ---
+    # --- watch ---
     desc "watch", "Start server with hot-reload + auto-docs + playground"
     option :bind, aliases: "-b", default: "0.0.0.0"
-    option :port, aliases: "-p", default: 3000
+    option :port, aliases: "-p", default: "3000" # 👈 STRING
     def watch
       CLI::WatchCommand.run(port: options[:port], bind: options[:bind])
     end
 
-    # --- CLI subcommand for generators ---
-    desc "g SUBCOMMAND ...ARGS", "Run generators (model, migration, scaffold, service, systemd, proxy, command)"
+    desc "g SUBCOMMAND ...ARGS", "Run generators"
     subcommand "g", Marlon::GeneratorsCLI
   end
 end
 
-# === Load all CLI commands AFTER CLI class exists ===
-Dir[File.join(__dir__, "cli", "commands", "*.rb")].sort.each { |f| require f }
-Marlon::CLI::Commands.constants.each do |command_class|
-  klass = Marlon::CLI::Commands.const_get(command_class)
-  klass.register(Marlon::CLI) if klass.respond_to?(:register)
-end
 
 
 # # lib/marlon/cli.rb
