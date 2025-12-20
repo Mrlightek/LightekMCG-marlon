@@ -5,7 +5,7 @@ require "erb"
 module Marlon
   module Generators
     class BaseGenerator
-      TEMPLATE_DIR = File.expand_path("../../../templates", __dir__)
+      TEMPLATE_DIR = File.expand_path("../templates", __dir__)
       USER_TEMPLATE_DIRS = [
         File.join(Dir.pwd, ".marlon", "templates"),
         File.join(Dir.home || "~", ".marlon", "templates")
